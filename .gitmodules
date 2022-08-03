@@ -4,3 +4,6 @@
 [submodule "3rd_party/precore"]
 	path = 3rd_party/precore
 	url = https://github.com/PredatorCZ/PreCore.git
+[submodule "3rd_party/decaf/cnl"]
+	path = 3rd_party/decaf/cnl
+	url = git@github.com:johnmcfarlane/cnl.git

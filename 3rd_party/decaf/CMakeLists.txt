@@ -1,0 +1,11 @@
+project(decaf)
+
+file(GLOB CORE_SOURCE_FILES "latte/*.cpp")
+file(GLOB CORE_SOURCE_FILES1 "common/*.cpp")
+file(GLOB CORE_SOURCE_FILES2 "fmt/*.cc")
+add_library(decaf OBJECT ${CORE_SOURCE_FILES} ${CORE_SOURCE_FILES1} ${CORE_SOURCE_FILES2})
+set_target_properties(decaf PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(decaf PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/cnl/include)
+if(WIN32)
+    target_link_libraries(decaf Dbghelp)
+endif()
