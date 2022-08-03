@@ -16,8 +16,8 @@
 */
 
 #pragma once
-#include "XenoLibAPI.h"
 #include "datas/vectors.hpp"
+#include "datas/matrix44.hpp"
 #include <memory>
 #include <vector>
 
@@ -101,33 +101,12 @@ public:
   virtual ~MXMDMaterials() {}
 };
 
-enum MXMDVertexDescriptorType {
-  MXMD_POSITION,
-  MXMD_WEIGHT32,
-  MXMD_BONEID,
-  MXMD_WEIGHTID,
-  MXMD_UV1 = 5,
-  MXMD_UV2,
-  MXMD_UV3,
-  MXMD_NORMAL32 = 15,
-  MXMD_TANGENT16, // NoFunc
-  MXMD_VERTEXCOLOR,
-  MXMD_NORMAL = 28,
-  MXMD_TANGENT, // NoFunc
-  MXMD_NORMAL2 = 32,
-  MXMD_REFLECTION, // NoFunc
-  MXMD_WEIGHT16 = 41,
-  MXMD_BONEID2,
-  MXMD_NORMALMORPH,
-  MXMD_MORPHVERTEXID
-};
-
 class MXMDVertexDescriptor {
 public:
   typedef std::unique_ptr<MXMDVertexDescriptor> Ptr;
 
   virtual void Evaluate(int at, void *data) {}
-  virtual MXMDVertexDescriptorType Type() const = 0;
+  //virtual MXMDVertexDescriptorType Type() const = 0;
   virtual int Size() const = 0;
   virtual ~MXMDVertexDescriptor() {}
 };
@@ -257,9 +236,9 @@ public:
   virtual ~MXMDExternalTextures() {}
 };
 
-class MXMDExternalResource {
+class ExternalResource {
 public:
-  virtual ~MXMDExternalResource() {}
+  virtual ~ExternalResource() {}
 };
 
 class MXMD {
@@ -269,7 +248,7 @@ class MXMD {
     char *masterBuffer;
     MXMDHeader *header;
   } data;
-  MXMDExternalResource *externalResource;
+  ExternalResource *externalResource;
 
   template <class _Ty0>
   // typedef wchar_t _Ty0;
