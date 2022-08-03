@@ -21,16 +21,16 @@
 #include "addrlib.h"
 #include <algorithm>
 
-unsigned int computeSurfaceThickness(GX2TileMode tileMode) {
+unsigned int computeSurfaceThickness(gx2::TileMode tileMode) {
+  using namespace gx2;
   switch (tileMode) {
-  case GX2_TILE_MODE_1D_TILED_THICK:
-  case GX2_TILE_MODE_2D_TILED_THICK:
-  case GX2_TILE_MODE_2B_TILED_THICK:
-  case GX2_TILE_MODE_3D_TILED_THICK:
-  case GX2_TILE_MODE_3B_TILED_THICK:
+  case gx2::TileMode::Tiled1DThick:
+  case gx2::TileMode::Tiled2DThick:
+  case gx2::TileMode::Tiled2BThick:
+  case gx2::TileMode::Tiled3DThick:
+  case gx2::TileMode::Tiled3BThick:
     return 4;
-  case GX2_TILE_MODE_LINEAR_SPECIAL:
-  case GX2_TILE_MODE_LINEAR_SPECIAL2:
+  case gx2::TileMode::LinearSpecial:
     return 8;
   default:
     return 1;
@@ -66,13 +66,14 @@ unsigned int computePixelIndexWithinMicroTile(unsigned int x, unsigned int y,
          4 * (y & 1) | 2 * ((x & 2) >> 1) | (x & 1);
 }
 
-unsigned int isThickMacroTiled(GX2TileMode tileMode) {
+unsigned int isThickMacroTiled(gx2::TileMode tileMode) {
+  using namespace gx2;
   switch (tileMode) {
 
-  case GX2_TILE_MODE_2D_TILED_THICK:
-  case GX2_TILE_MODE_2B_TILED_THICK:
-  case GX2_TILE_MODE_3D_TILED_THICK:
-  case GX2_TILE_MODE_3B_TILED_THICK:
+  case gx2::TileMode::Tiled2DThick:
+  case gx2::TileMode::Tiled2BThick:
+  case gx2::TileMode::Tiled3DThick:
+  case gx2::TileMode::Tiled3BThick:
     return 1;
   default:
     return 0;
@@ -81,14 +82,15 @@ unsigned int isThickMacroTiled(GX2TileMode tileMode) {
   return 0;
 }
 
-unsigned int isBankSwappedTileMode(GX2TileMode tileMode) {
+unsigned int isBankSwappedTileMode(gx2::TileMode tileMode) {
+  using namespace gx2;
   switch (tileMode) {
-  case GX2_TILE_MODE_2B_TILED_THIN1:
-  case GX2_TILE_MODE_2B_TILED_THIN2:
-  case GX2_TILE_MODE_2B_TILED_THIN4:
-  case GX2_TILE_MODE_2B_TILED_THICK:
-  case GX2_TILE_MODE_3B_TILED_THIN1:
-  case GX2_TILE_MODE_3B_TILED_THICK:
+  case gx2::TileMode::Tiled2BThin1:
+  case gx2::TileMode::Tiled2BThin2:
+  case gx2::TileMode::Tiled2BThin4:
+  case gx2::TileMode::Tiled2BThick:
+  case gx2::TileMode::Tiled3BThin1:
+  case gx2::TileMode::Tiled3BThick:
     return 1;
   default:
     return 0;
@@ -97,13 +99,14 @@ unsigned int isBankSwappedTileMode(GX2TileMode tileMode) {
   return 0;
 }
 
-unsigned int computeMacroTileAspectRatio(GX2TileMode tileMode) {
+unsigned int computeMacroTileAspectRatio(gx2::TileMode tileMode) {
+  using namespace gx2;
   switch (tileMode) {
-  case GX2_TILE_MODE_2D_TILED_THIN2:
-  case GX2_TILE_MODE_2B_TILED_THIN2:
+  case gx2::TileMode::Tiled2DThin2:
+  case gx2::TileMode::Tiled2BThin2:
     return 2;
-  case GX2_TILE_MODE_2D_TILED_THIN4:
-  case GX2_TILE_MODE_2B_TILED_THIN4:
+  case gx2::TileMode::Tiled2DThin4:
+  case gx2::TileMode::Tiled2BThin4:
     return 4;
   default:
     return 1;
@@ -112,7 +115,7 @@ unsigned int computeMacroTileAspectRatio(GX2TileMode tileMode) {
   return 1;
 }
 
-unsigned int computeSurfaceBankSwappedWidth(GX2TileMode tileMode,
+unsigned int computeSurfaceBankSwappedWidth(gx2::TileMode tileMode,
                                             unsigned int bpp,
                                             unsigned int pitch,
                                             unsigned int numSamples) {
@@ -148,10 +151,10 @@ unsigned int computeSurfaceBankSwappedWidth(GX2TileMode tileMode,
 
 AddrLibMicroTilePrecomp::AddrLibMicroTilePrecomp(unsigned int _bpp,
                                                  unsigned int pitch,
-                                                 GX2TileMode tileMode)
+                                                 gx2::TileMode tileMode)
     : bpp(_bpp) {
   const int microTileThickness =
-      tileMode == GX2_TILE_MODE_1D_TILED_THICK ? 4 : 1;
+      tileMode == gx2::TileMode::Tiled1DThick ? 4 : 1;
   microTileBytes = (64 * microTileThickness * _bpp + 7) / 8;
   microTilesPerRow = pitch >> 3;
 }
@@ -174,7 +177,7 @@ computeSurfaceAddrFromCoordMicroTiled(unsigned int x, unsigned int y,
 
 AddrLibMacroTilePrecomp::AddrLibMacroTilePrecomp(
     unsigned int _bpp, unsigned int pitch, unsigned int height,
-    GX2TileMode tileMode, unsigned int pipeSwizzle, unsigned int bankSwizzle)
+    gx2::TileMode tileMode, unsigned int pipeSwizzle, unsigned int bankSwizzle)
     : bpp(_bpp) {
   microTileThickness = computeSurfaceThickness(tileMode);
   microTileBits = _bpp * (microTileThickness * 64);
