@@ -1,61 +1,36 @@
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
-project(XenoLib)
-
-if(NOT TARGETEX_LOCATION)
-	set(TARGETEX_LOCATION 3rd_party/precore/cmake)
-	include(${TARGETEX_LOCATION}/targetex.cmake)
-	include(${TARGETEX_LOCATION}/chartype.cmake)
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+  message(FATAL_ERROR "X86 architecture is not supported!")
 endif()
 
-set(CMAKE_CXX_STANDARD 11)
+project(XenoLib VERSION 1)
 
-build_target(
-	TYPE STATIC
-	SOURCES
-		3rd_party/libpng/png.c
-		3rd_party/libpng/pngerror.c
-		3rd_party/libpng/pngget.c
-		3rd_party/libpng/pngmem.c
-		3rd_party/libpng/pngpread.c
-		3rd_party/libpng/pngread.c
-		3rd_party/libpng/pngrio.c
-		3rd_party/libpng/pngrtran.c
-		3rd_party/libpng/pngrutil.c
-		3rd_party/libpng/pngset.c
-		3rd_party/libpng/pngtest.c
-		3rd_party/libpng/pngtrans.c
-		3rd_party/libpng/pngwio.c
-		3rd_party/libpng/pngwrite.c
-		3rd_party/libpng/pngwtran.c
-		3rd_party/libpng/pngwutil.c
-		3rd_party/precore/datas/MasterPrinter.cpp 
-		3rd_party/zlib/adler32.c 
-		3rd_party/zlib/crc32.c 
-		3rd_party/zlib/deflate.c 
-		3rd_party/zlib/inffast.c 
-		3rd_party/zlib/inflate.c 
-		3rd_party/zlib/inftrees.c 
-		3rd_party/zlib/trees.c 
-		3rd_party/zlib/uncompr.c 
-		3rd_party/zlib/zutil.c 
-		source/BC.cpp 
-		source/DRSM.cpp 
-		source/LBIM.cpp 
-		source/MTHS.cpp 
-		source/MTXT.cpp 
-		source/MXMD.cpp 
-		source/PNGWrap.cpp 
-		source/SAR.cpp 
-	INCLUDES
-		source
-		include
-		3rd_party/precore
-		3rd_party/libpng
-		3rd_party/zlib
-		3rd_party/pugixml/src
-		3rd_party/zstd/lib
-		3rd_party/zstd/lib/common
-	NO_PROJECT_H
-	NO_VERINFO
-)
+# ~~~
+# Valid targets:
+#  - xeno-static: static library target (XN_STATIC_LIB == ON, force enables havok-objects target)
+#  - xeno-objects: static objects target (enabled by default, set NO_OBJECTS to disable all)
+#  - xeno: shared library target (BUILD_SHARED_LIBS == ON)
+# ~~~
+
+option(TOOLSET "Build toolset." ON)
+option(ODR_TEST "Enable ODR testing." OFF)
+
+option(OBJECTS_PID "Imply PID for all objects." ${PYTHON_MODULE})
+option(XN_STATIC_LIB "Builds xeno-static target." OFF)
+
+set(CMAKE_CXX_STANDARD 20)
+add_compile_options(-Wall -Wextra)
+
+if(TOOLSET)
+  set(BUILD_SHARED_LIBS ON)
+endif()
+
+set(TPD_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party)
+add_subdirectory(${TPD_PATH}/precore)
+include(targetex)
+add_subdirectory(source)
+
+if(TOOLSET)
+  add_subdirectory(toolset)
+endif()
