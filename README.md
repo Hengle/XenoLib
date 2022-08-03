@@ -1,24 +1,34 @@
 # XenoLib
-[![Build Status](https://travis-ci.org/PredatorCZ/XenoLib.svg?branch=master)](https://travis-ci.org/PredatorCZ/XenoLib)
+
+[![build](https://github.com/PredatorCZ/XenoLib/actions/workflows/cmake.yml/badge.svg)](https://github.com/PredatorCZ/XenoLib/actions/workflows/cmake.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![Codacy Badge](https://api.codacy.com/project/badge/Grade/ca0b675a83e4448cb90ddb858607b9f5)](https://app.codacy.com/app/PredatorCZ/XenoLib?utm_source=github.com&utm_medium=referral&utm_content=PredatorCZ/XenoLib&utm_campaign=Badge_Grade_Dashboard)
 
 XenoLib is independent serialize library for various formats used by Xenoblade Engine.\
-Library is compilable under VS 2015, 2017, 2019 and GCC 7, 8.
+Library is compilable under Clang 10, Windowns Clang 13.0.1 and G++10.
+
+## Toolset
+
+Toolset can be found in [Toolset folder](https://github.com/PredatorCZ/XenoLib/tree/master/toolset)
+
+[Toolset releases](https://github.com/PredatorCZ/XenoLib/releases)
 
 ## Supported formats
-* Loading for MXMD (camdo, wimdo) and their stream files.
-* DRSM
-* MTXT/LBIM conversion into dds/png format
+
+* MXMD models (camdo, wimdo)
+* DRSM/MXMD streams (casmt, wismt)
+* MTXT/LBIM textures (witex, catex)
 * XBC1 desompressor
-* SAR archive
+* SAR archives
+* BDAT data files
+* MTHS shaders
 * BC (SKEL, ANIM)
 
 ## License
+
 This library is available under GPL v3 license. (See LICENSE.md)
 
 This library uses following libraries:
 
-* libpng, more in libpng/LISENCE
-* PreCore, Copyright (c) 2016-2019 Lukas Cone
-* zlib, Copyright (C) 1995-2017 Jean-loup Gailly and Mark Adler
+* Decaf
+* PreCore, Copyright (c) 2016-2022 Lukas Cone
+* zlib, Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
