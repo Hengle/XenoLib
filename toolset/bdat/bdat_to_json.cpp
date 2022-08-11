@@ -15,7 +15,6 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "xenolib/bdat.hpp"
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/endian.hpp"
@@ -24,6 +23,7 @@
 #include "datas/reflector.hpp"
 #include "nlohmann/json.hpp"
 #include "project.h"
+#include "xenolib/bdat.hpp"
 
 static struct BDAT2JSON : ReflectorBase<BDAT2JSON> {
   bool extract = true;
@@ -52,6 +52,33 @@ nlohmann::json ToJSON(const BDAT::Header *hdr) {
   nlohmann::json jk;
   const char *values = hdr->keyValues;
   const BDAT::KeyDesc *keyDescs = hdr->keyDescs;
+  struct Flag {
+    es::string_view name;
+    uint16 index;
+    uint16 value;
+  };
+  std::map<const BDAT::KeyDesc *, std::vector<Flag>> flags;
+
+  for (uint16 k = 0; k < hdr->numKeyDescs; k++) {
+    auto &cDesc = keyDescs[k];
+    const BDAT::BaseTypeDesc *kDesc = cDesc.typeDesc;
+
+    if (kDesc->baseType == BDAT::BaseType::Flag) {
+      auto &flagType = *static_cast<const BDAT::FlagTypeDesc *>(kDesc);
+      Flag flg;
+      flg.name = cDesc.name.Get();
+      flg.index = flagType.index;
+      flg.value = flagType.value;
+
+      const BDAT::KeyDesc *key = flagType.belongsTo;
+
+      if (flags.contains(key)) {
+        flags.at(key).emplace_back(flg);
+      } else {
+        flags.emplace(key, std::vector<Flag>{flg});
+      }
+    }
+  }
 
   for (uint16 b = 0; b < hdr->numKeyValues; b++) {
     const char *block = values + hdr->kvBlockStride * b;
@@ -61,10 +88,52 @@ nlohmann::json ToJSON(const BDAT::Header *hdr) {
       auto &cDesc = keyDescs[k];
       const BDAT::BaseTypeDesc *kDesc = cDesc.typeDesc;
 
+      auto SetFlags = [](auto &flags, const BDAT::Value *bVal,
+                         BDAT::DataType type) {
+        uint32 data;
+        switch (type) {
+        case BDAT::DataType::i8:
+          data = bVal->asI8;
+          break;
+        case BDAT::DataType::i16:
+          data = bVal->asI16;
+          break;
+        case BDAT::DataType::i32:
+          data = bVal->asI32;
+          break;
+        case BDAT::DataType::u8:
+          data = bVal->asU8;
+          break;
+        case BDAT::DataType::u16:
+          data = bVal->asU16;
+          break;
+        case BDAT::DataType::u32:
+          data = bVal->asU32;
+          break;
+        default:
+          throw std::runtime_error("Invalid flag type");
+        }
+
+        std::map<es::string_view, bool> flagDict;
+
+        for (Flag &f : flags) {
+          flagDict.emplace(f.name, data & f.value);
+        }
+
+        auto retVal = nlohmann::json{flagDict};
+
+        return retVal.is_array() ? retVal.back() : retVal;
+      };
+
       auto SetValue = [&](nlohmann::json &at, size_t offset = 0) {
         auto &valueType = *static_cast<const BDAT::TypeDesc *>(kDesc);
         auto bVal = reinterpret_cast<const BDAT::Value *>(
             block + valueType.offset + offset);
+
+        if (flags.contains(&cDesc)) {
+          at = SetFlags(flags.at(&cDesc), bVal, valueType.type);
+          return;
+        }
 
         switch (valueType.type) {
         case BDAT::DataType::i8:
@@ -89,13 +158,7 @@ nlohmann::json ToJSON(const BDAT::Header *hdr) {
           at = bVal->asString.Get();
           break;
         case BDAT::DataType::Float: {
-          // Encryption is not enough?
-          // We also have to have encrypted floats?
-          constexpr uint64 coec = 0x4330000080000000;
-          uint64 raw = coec ^ bVal->asU32;
-          double dbl = reinterpret_cast<double &>(raw) -
-                       reinterpret_cast<const double &>(coec);
-          at = dbl * (1.f / 4096);
+          at = bVal->asFloat;
           break;
         }
         default:
@@ -159,8 +222,6 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
     if (col.numDatas > 0x10000) {
       FByteswapper(col);
       FByteswapper(col.datas);
-    } else {
-      throw std::runtime_error("Invalid format.");
     }
 
     rd.Seek(reinterpret_cast<uint32 &>(col.datas[0]));
@@ -176,7 +237,7 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
   std::string buffer;
   rd.ReadContainer(buffer, rd.GetSize());
   BDAT::Collection &col = reinterpret_cast<BDAT::Collection &>(*buffer.data());
-  ProcessClass(col, {ProcessFlag::EnsureBigEndian});
+  ProcessClass(col);
 
   if (settings.extract && col.numDatas > 1) {
     for (auto &d : col) {

@@ -54,7 +54,7 @@ bool KVPair::operator==(const Value &other) const {
 
 struct HeaderImpl : Header {
   void XN_EXTERN DecryptSection(char *begin, char *end) {
-    uint8 curKey[]{uint8(~encKeys[0]), uint8(~encKeys[1])};
+    uint8 curKey[]{uint8(~encKeys[1]), uint8(~encKeys[0])};
     size_t curIndex = 0;
     while (begin < end) {
       uint8 c = *begin;
@@ -71,7 +71,7 @@ struct HeaderImpl : Header {
     uint32 rndKey = distrib(gen);
     encKeys[0] = rndKey;
     encKeys[1] = rndKey >> 16;
-    uint8 curKey[]{uint8(~encKeys[0]), uint8(~encKeys[1])};
+    uint8 curKey[]{uint8(~encKeys[1]), uint8(~encKeys[0])};
     size_t curIndex = 0;
     while (begin < end) {
       *begin ^= curKey[curIndex % 2];
@@ -159,9 +159,10 @@ template <> void XN_EXTERN FByteswapper(BDAT::KeyDesc &item, bool) {
 template <> void XN_EXTERN FByteswapper(BDAT::Header &item, bool) {
   [](auto &...item) {
     (FByteswapper(item), ...);
-  }(item.unk0, item.name, item.kvBlockStride, item.unk1Offset, item.unk1Size,
+  }(item.name, item.kvBlockStride, item.unk1Offset, item.unk1Size,
     item.keyValues, item.numKeyValues, item.unk3, item.numEncKeys, item.strings,
     item.stringsSize, item.keyDescs, item.numKeyDescs);
+  std::swap(item.encKeys[0], item.encKeys[1]);
 }
 
 template <> void XN_EXTERN FByteswapper(BDAT::Collection &item, bool) {
@@ -173,8 +174,10 @@ template <>
 void XN_EXTERN ProcessClass(BDAT::FlagTypeDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
-  flags.NoLittleEndian();
-  FByteswapper(item);
+
+  if (flags == ProcessFlag::EnsureBigEndian) {
+    FByteswapper(item);
+  }
   item.belongsTo.Fixup(flags.base);
 }
 
@@ -182,14 +185,17 @@ template <>
 void XN_EXTERN ProcessClass(BDAT::BaseTypeDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
-  flags.NoLittleEndian();
 
   switch (item.baseType) {
   case BDAT::BaseType::Default:
-    FByteswapper(static_cast<BDAT::TypeDesc &>(item));
+    if (flags == ProcessFlag::EnsureBigEndian) {
+      FByteswapper(static_cast<BDAT::TypeDesc &>(item));
+    }
     break;
   case BDAT::BaseType::Array:
-    FByteswapper(static_cast<BDAT::ArrayTypeDesc &>(item));
+    if (flags == ProcessFlag::EnsureBigEndian) {
+      FByteswapper(static_cast<BDAT::ArrayTypeDesc &>(item));
+    }
     break;
   case BDAT::BaseType::Flag:
     ProcessClass(static_cast<BDAT::FlagTypeDesc &>(item), flags);
@@ -203,9 +209,10 @@ template <>
 void XN_EXTERN ProcessClass(BDAT::KeyDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
-  flags.NoLittleEndian();
 
-  FByteswapper(item);
+  if (flags == ProcessFlag::EnsureBigEndian) {
+    FByteswapper(item);
+  }
 
   item.name.Fixup(flags.base);
   item.unk.Fixup(flags.base);
@@ -222,9 +229,10 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
 
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
-  flags.NoLittleEndian();
 
-  FByteswapper(item);
+  if (flags == ProcessFlag::EnsureBigEndian) {
+    FByteswapper(item);
+  }
 
   flags.base = reinterpret_cast<char *>(&item);
   assert(item.numEncKeys == 2);
@@ -263,15 +271,33 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
         switch (valueType.type) {
         case BDAT::DataType::i16:
         case BDAT::DataType::u16:
-          FByteswapper(bVal->asU16);
+          if (flags == ProcessFlag::EnsureBigEndian) {
+            FByteswapper(bVal->asU16);
+          }
           break;
         case BDAT::DataType::i32:
         case BDAT::DataType::u32:
+          if (flags == ProcessFlag::EnsureBigEndian) {
+            FByteswapper(bVal->asU32);
+          }
+          break;
         case BDAT::DataType::Float:
-          FByteswapper(bVal->asU32);
+          if (flags == ProcessFlag::EnsureBigEndian) {
+            FByteswapper(bVal->asU32);
+          }
+
+          if (item.flags == BDAT::Type::EncryptFloat) {
+            constexpr uint64 coec = 0x4330000080000000;
+            uint64 raw = coec ^ bVal->asU32;
+            double dbl = reinterpret_cast<double &>(raw) -
+                         reinterpret_cast<const double &>(coec);
+            bVal->asFloat = dbl * (1.f / 4096);
+          }
           break;
         case BDAT::DataType::StringPtr:
-          FByteswapper(bVal->asU32);
+          if (flags == ProcessFlag::EnsureBigEndian) {
+            FByteswapper(bVal->asU32);
+          }
           bVal->asString.Fixup(flags.base);
           break;
         case BDAT::DataType::i8:
@@ -336,12 +362,16 @@ void XN_EXTERN ProcessClass(BDAT::Collection &item, ProcessFlags flags) {
     }
   }
 
-  flags.NoLittleEndian();
   flags.base = reinterpret_cast<char *>(&item);
-  FByteswapper(item);
+
+  if (flags == ProcessFlag::EnsureBigEndian) {
+    FByteswapper(item);
+  }
 
   for (auto &p : item) {
-    FByteswapper(p);
+    if (flags == ProcessFlag::EnsureBigEndian) {
+      FByteswapper(p);
+    }
     p.Fixup(flags.base);
     ProcessClass(*p.Get(), flags);
   }

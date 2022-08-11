@@ -15,7 +15,6 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "xenolib/bdat.hpp"
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/binwritter.hpp"
@@ -23,6 +22,7 @@
 #include "datas/except.hpp"
 #include "datas/fileinfo.hpp"
 #include "project.h"
+#include "xenolib/bdat.hpp"
 
 es::string_view filters[]{
     ".bdat$",
@@ -48,6 +48,7 @@ struct HeaderImpl : Header {
 
 void AppProcessFile(std::istream &stream, AppContext *ctx) {
   BinReaderRef rd(stream);
+  bool endianBig = false;
   {
     BDAT::Collection col;
     rd.Push();
@@ -56,8 +57,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     if (col.numDatas > 0x10000) {
       FByteswapper(col);
       FByteswapper(col.datas);
-    } else {
-      throw std::runtime_error("Invalid format.");
+      endianBig = true;
     }
 
     rd.Seek(reinterpret_cast<uint32 &>(col.datas[0]));
@@ -73,14 +73,20 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   std::string buffer;
   rd.ReadContainer(buffer, rd.GetSize());
   BDAT::Collection &col = reinterpret_cast<BDAT::Collection &>(*buffer.data());
-  FByteswapper(col);
+  if (endianBig) {
+    FByteswapper(col);
+  }
   char *base = reinterpret_cast<char *>(&col);
 
   for (auto &p : col) {
-    FByteswapper(p);
+    if (endianBig) {
+      FByteswapper(p);
+    }
     p.Fixup(base);
     BDAT::Header *hdr = p;
-    FByteswapper(*hdr);
+    if (endianBig) {
+      FByteswapper(*hdr);
+    }
     char *hbase = reinterpret_cast<char *>(hdr);
     [&](auto &...item) {
       (item.Fixup(hbase), ...);

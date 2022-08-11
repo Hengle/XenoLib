@@ -16,10 +16,10 @@
 */
 
 #pragma once
+#include "core.hpp"
 #include "datas/pointer.hpp"
 #include "datas/string_view.hpp"
 #include "datas/supercore.hpp"
-#include "core.hpp"
 
 namespace BDAT {
 constexpr static uint32 ID = CompileFourCC("BDAT");
@@ -45,6 +45,8 @@ enum class DataType : uint8 {
   Float,
 };
 
+struct KeyDesc;
+
 struct BaseTypeDesc {
   BaseType baseType;
 };
@@ -53,7 +55,7 @@ struct FlagTypeDesc : BaseTypeDesc {
   uint8 index;
   uint16 null;
   uint16 value;
-  Pointer16<BaseTypeDesc> belongsTo;
+  Pointer16<KeyDesc> belongsTo;
 };
 
 struct TypeDesc : BaseTypeDesc {
@@ -110,9 +112,17 @@ struct KVPair {
   }
 };
 
+enum class Type : uint8 {
+  EncryptFloat,
+  PersistentFlag, // Is this whole encryption?
+};
+
+using Flags = es::Flags<Type>;
+
 struct Header {
   uint32 id;
-  uint16 unk0;
+  uint8 version;
+  Flags flags;
   Pointer16<char> name;
   uint16 kvBlockStride;
   Pointer16<char> unk1Offset;
