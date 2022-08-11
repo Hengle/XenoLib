@@ -21,7 +21,7 @@
 #include <cassert>
 #include <random>
 
-namespace BDAT {
+namespace BDAT::V1 {
 bool KVPair::operator==(const Value &other) const {
   if (desc->baseType != BaseType::Default) {
     return false; // throw?
@@ -132,31 +132,31 @@ const Header *Collection::FindData(es::string_view name) const {
 
   return nullptr;
 }
-} // namespace BDAT
+} // namespace BDAT::V1
 
-template <> void XN_EXTERN FByteswapper(BDAT::FlagTypeDesc &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::FlagTypeDesc &item, bool) {
   FByteswapper(item.belongsTo);
   FByteswapper(item.null);
   FByteswapper(item.value);
   assert(item.null == 0);
 }
 
-template <> void XN_EXTERN FByteswapper(BDAT::TypeDesc &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::TypeDesc &item, bool) {
   FByteswapper(item.offset);
 }
 
-template <> void XN_EXTERN FByteswapper(BDAT::ArrayTypeDesc &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::ArrayTypeDesc &item, bool) {
   FByteswapper(item.numItems);
   FByteswapper(item.offset);
 }
 
-template <> void XN_EXTERN FByteswapper(BDAT::KeyDesc &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::KeyDesc &item, bool) {
   FByteswapper(item.name);
   FByteswapper(item.unk);
   FByteswapper(item.typeDesc);
 }
 
-template <> void XN_EXTERN FByteswapper(BDAT::Header &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::Header &item, bool) {
   [](auto &...item) {
     (FByteswapper(item), ...);
   }(item.name, item.kvBlockStride, item.unk1Offset, item.unk1Size,
@@ -165,13 +165,13 @@ template <> void XN_EXTERN FByteswapper(BDAT::Header &item, bool) {
   std::swap(item.encKeys[0], item.encKeys[1]);
 }
 
-template <> void XN_EXTERN FByteswapper(BDAT::Collection &item, bool) {
+template <> void XN_EXTERN FByteswapper(BDAT::V1::Collection &item, bool) {
   FByteswapper(item.numDatas);
   FByteswapper(item.fileSize);
 }
 
 template <>
-void XN_EXTERN ProcessClass(BDAT::FlagTypeDesc &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(BDAT::V1::FlagTypeDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
 
@@ -182,23 +182,23 @@ void XN_EXTERN ProcessClass(BDAT::FlagTypeDesc &item, ProcessFlags flags) {
 }
 
 template <>
-void XN_EXTERN ProcessClass(BDAT::BaseTypeDesc &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(BDAT::V1::BaseTypeDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
 
   switch (item.baseType) {
-  case BDAT::BaseType::Default:
+  case BDAT::V1::BaseType::Default:
     if (flags == ProcessFlag::EnsureBigEndian) {
-      FByteswapper(static_cast<BDAT::TypeDesc &>(item));
+      FByteswapper(static_cast<BDAT::V1::TypeDesc &>(item));
     }
     break;
-  case BDAT::BaseType::Array:
+  case BDAT::V1::BaseType::Array:
     if (flags == ProcessFlag::EnsureBigEndian) {
-      FByteswapper(static_cast<BDAT::ArrayTypeDesc &>(item));
+      FByteswapper(static_cast<BDAT::V1::ArrayTypeDesc &>(item));
     }
     break;
-  case BDAT::BaseType::Flag:
-    ProcessClass(static_cast<BDAT::FlagTypeDesc &>(item), flags);
+  case BDAT::V1::BaseType::Flag:
+    ProcessClass(static_cast<BDAT::V1::FlagTypeDesc &>(item), flags);
     break;
   default:
     throw std::runtime_error("Undefined base type");
@@ -206,7 +206,7 @@ void XN_EXTERN ProcessClass(BDAT::BaseTypeDesc &item, ProcessFlags flags) {
 }
 
 template <>
-void XN_EXTERN ProcessClass(BDAT::KeyDesc &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(BDAT::V1::KeyDesc &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
 
@@ -222,7 +222,7 @@ void XN_EXTERN ProcessClass(BDAT::KeyDesc &item, ProcessFlags flags) {
 }
 
 template <>
-void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(BDAT::V1::Header &item, ProcessFlags flags) {
   if (item.id != BDAT::ID) {
     throw es::InvalidHeaderError(item.id);
   }
@@ -241,31 +241,31 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
     (item.Fixup(flags.base), ...);
   }(item.name, item.unk1Offset, item.keyValues, item.strings, item.keyDescs);
 
-  static_cast<BDAT::HeaderImpl &>(item).DecryptSection(item.name.Get(),
-                                                       item.unk1Offset.Get());
+  static_cast<BDAT::V1::HeaderImpl &>(item).DecryptSection(
+      item.name.Get(), item.unk1Offset.Get());
 
   if (char *strings = item.strings; item.stringsSize) {
-    static_cast<BDAT::HeaderImpl &>(item).DecryptSection(
+    static_cast<BDAT::V1::HeaderImpl &>(item).DecryptSection(
         strings, strings + item.stringsSize);
   }
 
-  BDAT::KeyDesc *ck = item.keyDescs;
+  BDAT::V1::KeyDesc *ck = item.keyDescs;
   for (uint16 k = 0; k < item.numKeyDescs; k++) {
     ProcessClass(ck[k], flags);
   }
 
   char *values = item.keyValues;
-  const BDAT::KeyDesc *keyDescs = item.keyDescs;
+  const BDAT::V1::KeyDesc *keyDescs = item.keyDescs;
 
   for (uint16 k = 0; k < item.numKeyValues; k++) {
     char *block = values + item.kvBlockStride * k;
 
     for (uint16 k = 0; k < item.numKeyDescs; k++) {
       auto &cDesc = keyDescs[k];
-      const BDAT::BaseTypeDesc *kDesc = cDesc.typeDesc;
+      const BDAT::V1::BaseTypeDesc *kDesc = cDesc.typeDesc;
 
       auto SwapValue = [&](size_t itemOffset = 0) {
-        auto &valueType = *static_cast<const BDAT::TypeDesc *>(kDesc);
+        auto &valueType = *static_cast<const BDAT::V1::TypeDesc *>(kDesc);
         auto bVal = reinterpret_cast<BDAT::Value *>(block + valueType.offset +
                                                     itemOffset);
         switch (valueType.type) {
@@ -286,7 +286,7 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
             FByteswapper(bVal->asU32);
           }
 
-          if (item.flags == BDAT::Type::EncryptFloat) {
+          if (item.flags == BDAT::V1::Type::EncryptFloat) {
             constexpr uint64 coec = 0x4330000080000000;
             uint64 raw = coec ^ bVal->asU32;
             double dbl = reinterpret_cast<double &>(raw) -
@@ -309,12 +309,12 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
       };
 
       switch (kDesc->baseType) {
-      case BDAT::BaseType::Default:
+      case BDAT::V1::BaseType::Default:
         SwapValue();
-      case BDAT::BaseType::Flag:
+      case BDAT::V1::BaseType::Flag:
         break;
-      case BDAT::BaseType::Array: {
-        auto &valueType = *static_cast<const BDAT::ArrayTypeDesc *>(kDesc);
+      case BDAT::V1::BaseType::Array: {
+        auto &valueType = *static_cast<const BDAT::V1::ArrayTypeDesc *>(kDesc);
         size_t typeLen = [&] {
           switch (valueType.type) {
           case BDAT::DataType::i16:
@@ -351,7 +351,7 @@ void XN_EXTERN ProcessClass(BDAT::Header &item, ProcessFlags flags) {
 }
 
 template <>
-void XN_EXTERN ProcessClass(BDAT::Collection &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(BDAT::V1::Collection &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
 
   if (flags == ProcessFlag::AutoDetectEndian) {
@@ -372,6 +372,63 @@ void XN_EXTERN ProcessClass(BDAT::Collection &item, ProcessFlags flags) {
     if (flags == ProcessFlag::EnsureBigEndian) {
       FByteswapper(p);
     }
+    p.Fixup(flags.base);
+    ProcessClass(*p.Get(), flags);
+  }
+}
+
+template <>
+void XN_EXTERN ProcessClass(BDAT::V4::Header &item, ProcessFlags flags) {
+  if (item.id != BDAT::ID) {
+    throw es::InvalidHeaderError(item.id);
+  }
+
+  flags.NoProcessDataOut();
+  flags.NoAutoDetect();
+  flags.NoBigEndian();
+
+  flags.base = reinterpret_cast<char *>(&item);
+
+  [&](auto &...item) {
+    (item.Fixup(flags.base), ...);
+  }(item.descriptors, item.keys, item.values, item.strings);
+
+  char *values = item.values;
+  const BDAT::V4::Descriptor *keyDescs = item.descriptors;
+  size_t curOffset = 0;
+
+  for (uint16 k = 0; k < item.numDescs; k++) {
+    auto &cDesc = keyDescs[k];
+
+    if (cDesc.type == BDAT::DataType::StringPtr) {
+      for (uint16 k = 0; k < item.numKeys; k++) {
+        char *block = values + item.kvBlockSize * k;
+        auto str = reinterpret_cast<BDAT::Pointer<char> *>(block + curOffset);
+        str->FixupRelative(item.strings);
+      }
+    }
+
+    curOffset += BDAT::TypeSize(cDesc.type);
+  }
+}
+
+template <>
+void XN_EXTERN ProcessClass(BDAT::V4::Collection &item, ProcessFlags flags) {
+  if (item.id != BDAT::ID) {
+    throw es::InvalidHeaderError(item.id);
+  }
+
+  flags.NoProcessDataOut();
+  flags.NoBigEndian();
+  flags.NoAutoDetect();
+
+  if (item.type != BDAT::V4::Type::Collection) {
+    throw std::runtime_error("Supplied data are not collection");
+  }
+
+  flags.base = reinterpret_cast<char *>(&item);
+
+  for (auto &p : item) {
     p.Fixup(flags.base);
     ProcessClass(*p.Get(), flags);
   }

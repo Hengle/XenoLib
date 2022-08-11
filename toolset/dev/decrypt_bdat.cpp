@@ -40,7 +40,7 @@ static AppInfo_s appInfo{
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-namespace BDAT {
+namespace BDAT::V1 {
 struct HeaderImpl : Header {
   void XN_EXTERN DecryptSection(char *, char *);
 };
@@ -50,7 +50,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   BinReaderRef rd(stream);
   bool endianBig = false;
   {
-    BDAT::Collection col;
+    BDAT::V1::Collection col;
     rd.Push();
     rd.Read(col);
 
@@ -72,7 +72,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
 
   std::string buffer;
   rd.ReadContainer(buffer, rd.GetSize());
-  BDAT::Collection &col = reinterpret_cast<BDAT::Collection &>(*buffer.data());
+  BDAT::V1::Collection &col = reinterpret_cast<BDAT::V1::Collection &>(*buffer.data());
   if (endianBig) {
     FByteswapper(col);
   }
@@ -83,7 +83,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       FByteswapper(p);
     }
     p.Fixup(base);
-    BDAT::Header *hdr = p;
+    BDAT::V1::Header *hdr = p;
     if (endianBig) {
       FByteswapper(*hdr);
     }
@@ -92,11 +92,11 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       (item.Fixup(hbase), ...);
     }(hdr->name, hdr->unk1Offset, hdr->keyValues, hdr->strings, hdr->keyDescs);
 
-    static_cast<BDAT::HeaderImpl *>(hdr)->DecryptSection(hdr->name.Get(),
+    static_cast<BDAT::V1::HeaderImpl *>(hdr)->DecryptSection(hdr->name.Get(),
                                                          hdr->unk1Offset.Get());
 
     if (char *strings = hdr->strings; hdr->stringsSize) {
-      static_cast<BDAT::HeaderImpl *>(hdr)->DecryptSection(
+      static_cast<BDAT::V1::HeaderImpl *>(hdr)->DecryptSection(
           strings, strings + hdr->stringsSize);
     }
   }

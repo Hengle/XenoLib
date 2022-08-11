@@ -24,14 +24,6 @@
 namespace BDAT {
 constexpr static uint32 ID = CompileFourCC("BDAT");
 template <class C> using Pointer = es::PointerX86<C>;
-template <class C> using Pointer16 = es::PointerX86<C, int16>;
-
-enum class BaseType : uint8 {
-  None,
-  Default,
-  Array,
-  Flag,
-};
 
 enum class DataType : uint8 {
   None,
@@ -43,35 +35,31 @@ enum class DataType : uint8 {
   i32,
   StringPtr,
   Float,
+  KeyHash,
+  Unk = 11, // Pointer??
+  Unk1 = 13, // Child index??
 };
 
-struct KeyDesc;
-
-struct BaseTypeDesc {
-  BaseType baseType;
-};
-
-struct FlagTypeDesc : BaseTypeDesc {
-  uint8 index;
-  uint16 null;
-  uint16 value;
-  Pointer16<KeyDesc> belongsTo;
-};
-
-struct TypeDesc : BaseTypeDesc {
-  DataType type;
-  uint16 offset;
-};
-
-struct ArrayTypeDesc : TypeDesc {
-  uint16 numItems;
-};
-
-struct KeyDesc {
-  Pointer16<BaseTypeDesc> typeDesc;
-  Pointer16<KeyDesc> unk; // random refs
-  Pointer16<char> name;
-};
+inline size_t TypeSize(DataType type) {
+  switch (type) {
+  case BDAT::DataType::i16:
+  case BDAT::DataType::u16:
+  case BDAT::DataType::Unk1:
+    return 2;
+  case BDAT::DataType::i32:
+  case BDAT::DataType::u32:
+  case BDAT::DataType::StringPtr:
+  case BDAT::DataType::Float:
+  case BDAT::DataType::KeyHash:
+  case BDAT::DataType::Unk:
+    return 4;
+  case BDAT::DataType::i8:
+  case BDAT::DataType::u8:
+    return 1;
+  default:
+    throw std::runtime_error("Unhandled data type");
+  }
+}
 
 union Value {
   int8 asI8;
@@ -84,74 +72,6 @@ union Value {
   Pointer<char> asString;
 };
 
-struct KVPair {
-  const BaseTypeDesc *desc;
-  union {
-    const char *data;
-    const Value *value;
-  };
-
-  bool XN_EXTERN operator==(const Value &other) const;
-
-  bool operator==(es::string_view other) const {
-    if (IsString()) {
-      return other == value->asString.Get();
-    }
-
-    throw std::runtime_error("Invalid call for string comparison");
-  }
-
-  bool IsString() const {
-    if (desc->baseType != BaseType::Default) {
-      return false;
-    }
-
-    auto &asDef = *static_cast<const TypeDesc *>(desc);
-
-    return asDef.type == DataType::StringPtr;
-  }
-};
-
-enum class Type : uint8 {
-  EncryptFloat,
-  PersistentFlag, // Is this whole encryption?
-};
-
-using Flags = es::Flags<Type>;
-
-struct Header {
-  uint32 id;
-  uint8 version;
-  Flags flags;
-  Pointer16<char> name;
-  uint16 kvBlockStride;
-  Pointer16<char> unk1Offset;
-  uint16 unk1Size;
-  Pointer16<char> keyValues;
-  uint16 numKeyValues;
-  uint16 unk3;
-  uint16 numEncKeys;
-  uint8 encKeys[2];
-  Pointer<char> strings;
-  uint32 stringsSize;
-  Pointer16<KeyDesc> keyDescs;
-  uint16 numKeyDescs;
-
-  const char XN_EXTERN *FindBlock(es::string_view keyName, Value value);
-  const char XN_EXTERN *FindBlock(es::string_view keyName,
-                                  es::string_view value);
-};
-
-struct Collection {
-  uint32 numDatas;
-  uint32 fileSize;
-  Pointer<Header> datas[1];
-
-  Pointer<Header> *begin() { return datas; }
-  Pointer<Header> *end() { return datas + numDatas; }
-  const Pointer<Header> *begin() const { return datas; }
-  const Pointer<Header> *end() const { return datas + numDatas; }
-
-  const Header XN_EXTERN *FindData(es::string_view name) const;
-};
+#include "internal/bdat1.inl"
+#include "internal/bdat4.inl"
 } // namespace BDAT
