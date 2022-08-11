@@ -25,7 +25,7 @@
 #include "xenolib/xbc1.hpp"
 
 es::string_view filters[]{
-    ".catex$", ".witex$", ".wismt$", ".calut$", ".witx$", {},
+    ".catex$", ".witex$", ".wismt$", ".calut$", ".witx$", ".pcsmt$", {},
 };
 
 static AppInfo_s appInfo{
@@ -71,6 +71,22 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     BinReaderRef hird(*hiStream.Get());
     hird.ReadContainer(buffer, hird.GetSize());
     hiData = DecompressXBC1(buffer.data());
+  } else if (outPath.GetExtension() == ".pcsmt") {
+    uint32 id;
+    rd.Push();
+    if (rd.Read(id); id != CompileFourCC("xbc1")) {
+      printinfo("File is stream, not texture, skipping.");
+      return;
+    }
+
+    rd.Pop();
+    std::string buffer;
+    rd.ReadContainer(buffer, rd.GetSize());
+    texData = DecompressXBC1(buffer.data());
+
+    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".dds");
+    wr.WriteContainer(texData);
+    return;
   } else {
     rd.ReadContainer(texData, rd.GetSize());
   }

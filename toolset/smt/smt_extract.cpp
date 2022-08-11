@@ -30,6 +30,7 @@
 es::string_view filters[]{
     ".wismt$",
     ".casmt$",
+    ".pcsmt$",
     {},
 };
 
@@ -144,9 +145,10 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
     throw std::runtime_error("No files.");
   }
 
+  uint32 numProcessedTextures = 0;
+
   for (int32 index = 0; auto &t : textures->textures) {
     int32 hIndex = -1;
-    ctx->NewFile(t.name.Get() + std::string(".dds"));
 
     for (int32 index_ = 0; auto h : resources->textureIndices) {
       if (h == index) {
@@ -169,6 +171,8 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
 
       es::string_view miMip(middleTextures + entry.offset, entry.size);
       auto tex = LBIM::Mount(miMip);
+      ctx->NewFile(t.name.Get() + std::string(".dds"));
+      numProcessedTextures++;
 
       if (entry.unkIndex > resources->middleTexturesStreamIndex) {
         std::string hiMip =
@@ -191,16 +195,27 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
       }
 
     } else {
+      numProcessedTextures++;
+      ctx->NewFile(t.name.Get() + std::string(".dds"));
       auto &entry = entries[resources->lowTexturesStreamEntryIndex];
       auto loMips = cache.GetSet(streams[resources->lowTexturesStreamIndex], 0);
       es::string_view loMip(loMips + entry.offset + t.lowOffset, t.lowSize);
-      std::string loMipOut;
-      loMipOut.resize(loMip.size());
-      auto tex = LBIM::Mount(loMip);
-      SendDDS(tex, ctx);
-      LBIM::DecodeMipmap(*tex, loMip.data(), loMipOut.data());
-      ctx->SendData(loMipOut);
+
+      if (loMip.begins_with("DDS")) {
+        ctx->SendData(loMip);
+      } else {
+        std::string loMipOut;
+        loMipOut.resize(loMip.size());
+        auto tex = LBIM::Mount(loMip);
+        SendDDS(tex, ctx);
+        LBIM::DecodeMipmap(*tex, loMip.data(), loMipOut.data());
+        ctx->SendData(loMipOut);
+      }
     }
+  }
+
+  if (!numProcessedTextures) {
+    throw std::runtime_error("No files.");
   }
 }
 
@@ -333,7 +348,7 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
   BinReaderRef rd(stream);
   AFileInfo info(ctx->ctx->workingFile);
 
-  if (info.GetExtension() == ".wismt") {
+  if (info.GetExtension() == ".wismt" || info.GetExtension() == ".pcsmt") {
     try {
       TryExtractDRSM(rd, ctx);
     } catch (const es::InvalidHeaderError &e) {
