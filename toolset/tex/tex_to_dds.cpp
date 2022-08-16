@@ -42,11 +42,12 @@ AppInfo_s *AppInitModule() { return &appInfo; }
 void AppProcessFile(std::istream &stream, AppContext *ctx) {
   BinReaderRef rd(stream);
   AFileInfo outPath(ctx->outFile);
+  AFileInfo workingPath(ctx->workingFile);
   std::string texData;
   std::string hiData;
 
-  if (outPath.GetExtension() == ".wismt") {
-    auto folder = outPath.GetFolder();
+  if (workingPath.GetExtension() == ".wismt") {
+    auto folder = workingPath.GetFolder();
 
     if (!folder.ends_with("tex/nx/m/")) {
       printwarning("Supplied wismt file folder is not tex/nx/m, skipping");
@@ -67,11 +68,11 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
 
     auto hiStream =
         ctx->RequestFile(folder.to_string().replace(folder.size() - 2, 1, "h") +
-                         outPath.GetFilenameExt().to_string());
+                         workingPath.GetFilenameExt().to_string());
     BinReaderRef hird(*hiStream.Get());
     hird.ReadContainer(buffer, hird.GetSize());
     hiData = DecompressXBC1(buffer.data());
-  } else if (outPath.GetExtension() == ".pcsmt") {
+  } else if (workingPath.GetExtension() == ".pcsmt") {
     uint32 id;
     rd.Push();
     if (rd.Read(id); id != CompileFourCC("xbc1")) {
