@@ -8,5 +8,6 @@ add_spike_subdir(smt)
 add_spike_subdir(sar)
 add_spike_subdir(tex)
 add_spike_subdir(shader)
+add_spike_subdir(arh)
 
 #add_spike_subdir(dev)
