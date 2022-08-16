@@ -16,9 +16,9 @@ jobs:
             CC: gcc-10
             CXX: g++-10
             artifacts: true
-          - name: Clang 10 & ODR
-            CC: clang-10
-            CXX: clang++-10
+          - name: Clang 12 & ODR
+            CC: clang-12
+            CXX: clang++-12
             use-odr: true
 
     env:
