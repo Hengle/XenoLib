@@ -7,3 +7,6 @@
 [submodule "3rd_party/decaf/cnl"]
 	path = 3rd_party/decaf/cnl
 	url = git@github.com:johnmcfarlane/cnl.git
+[submodule "3rd_party/zstd"]
+	path = 3rd_party/zstd
+	url = git@github.com:facebook/zstd.git

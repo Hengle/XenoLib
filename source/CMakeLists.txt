@@ -1,10 +1,15 @@
 file(GLOB SOURCE_FILES_ "*.cpp")
 
 file(GLOB ZLIB_SOURCE_FILES "${TPD_PATH}/zlib/*.c")
+file(GLOB_RECURSE ZSTD_SOURCE_FILES "${TPD_PATH}/zstd/lib/*.c")
+
+enable_language(ASM)
 
 set(CORE_SOURCE_FILES
   ${ZLIB_SOURCE_FILES}
   ${SOURCE_FILES_}
+  ${ZSTD_SOURCE_FILES}
+  ${TPD_PATH}/zstd/lib/decompress/huf_decompress_amd64.S
 )
 
 if((NOT NO_OBJECTS) OR XN_STATIC_LIB)
@@ -27,7 +32,7 @@ if((NOT NO_OBJECTS) OR XN_STATIC_LIB)
   target_include_directories(
     xeno-objects
     PUBLIC ../include
-    PRIVATE . ${TPD_PATH}/zlib)
+    PRIVATE . ${TPD_PATH}/zlib ${TPD_PATH}/zstd/lib/common ${TPD_PATH}/zstd/lib)
 endif()
 
 if(XN_STATIC_LIB)
@@ -64,7 +69,7 @@ if(BUILD_SHARED_LIBS)
   target_include_directories(
     xeno
     PUBLIC ../include
-    PRIVATE . ${TPD_PATH}/zlib)
+    PRIVATE . ${TPD_PATH}/zlib ${TPD_PATH}/zstd/lib/common ${TPD_PATH}/zstd/lib)
 
   target_compile_definitions(
     xeno

@@ -18,13 +18,20 @@
 #include "xenolib/xbc1.hpp"
 #include "datas/except.hpp"
 #include "zlib.h"
+#define ZSTD_DISABLE_DEPRECATE_WARNINGS
+#include "zstd.h"
 
 namespace {
+enum class CompType {
+  Zlib = 1,
+  Zstd = 3,
+};
+
 struct xbc1 {
   static constexpr int ID = CompileFourCC("xbc1");
 
   uint32 id;
-  uint32 version;
+  CompType compressionType;
   uint32 uncompressedSize;
   uint32 compressedSize;
   uint32 hash;
@@ -39,27 +46,37 @@ std::string DecompressXBC1(const char *data) {
     throw es::InvalidHeaderError(hdr->id);
   }
 
-  if (hdr->version != 1) {
-    throw es::InvalidVersionError(hdr->version);
-  }
-
   std::string retval;
   retval.resize(hdr->uncompressedSize);
   uLongf dataWritten = retval.size();
 
-  if (int status = uncompress(
-          reinterpret_cast<Bytef *>(retval.data()), &dataWritten,
-          reinterpret_cast<const Bytef *>(hdr + 1), hdr->compressedSize);
-      status != Z_OK) [[unlikely]] {
-    if (status == Z_MEM_ERROR) {
-      throw std::runtime_error("Zlib, not enough memory");
-    } else if (status == Z_DATA_ERROR) [[likely]] {
-      throw std::runtime_error("Zlib, data is corrupted");
-    } else if (status == Z_DATA_ERROR) {
-      throw std::runtime_error("Zlib, output buffer is not big enough");
-    } else [[unlikely]] {
-      throw std::runtime_error("Zlib, decompression failed");
+  if (hdr->compressionType == CompType::Zlib) {
+    if (int status = uncompress(
+            reinterpret_cast<Bytef *>(retval.data()), &dataWritten,
+            reinterpret_cast<const Bytef *>(hdr + 1), hdr->compressedSize);
+        status != Z_OK) [[unlikely]] {
+      if (status == Z_MEM_ERROR) {
+        throw std::runtime_error("Zlib, not enough memory");
+      } else if (status == Z_DATA_ERROR) [[likely]] {
+        throw std::runtime_error("Zlib, data is corrupted");
+      } else if (status == Z_DATA_ERROR) {
+        throw std::runtime_error("Zlib, output buffer is not big enough");
+      } else [[unlikely]] {
+        throw std::runtime_error("Zlib, decompression failed");
+      }
     }
+  } else if (hdr->compressionType == CompType::Zstd) {
+    size_t status = ZSTD_decompress(retval.data(), dataWritten, hdr + 1,
+                                    hdr->compressedSize);
+
+    if (ZSTD_isError(status)) {
+      throw std::runtime_error("ZSTD, decompression failed: " +
+                               std::string(ZSTD_getErrorName(status)));
+    }
+
+  } else {
+    throw std::runtime_error("invalid compression type: " +
+                             std::to_string(uint32(hdr->compressionType)));
   }
 
   return retval;
