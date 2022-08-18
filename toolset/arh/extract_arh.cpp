@@ -19,6 +19,7 @@
 #include "datas/binreader_stream.hpp"
 #include "datas/except.hpp"
 #include "datas/fileinfo.hpp"
+#include "datas/master_printer.hpp"
 #include "project.h"
 #include "xenolib/arh.hpp"
 #include "xenolib/xbc1.hpp"
@@ -118,7 +119,14 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
   for (size_t f = 0; f < hdr.numFiles; f++) {
     ARH::FileEntry entry;
     rd.Read(entry);
-    ctx->NewFile(fileNames.at(entry.index));
+    auto &fileName = fileNames.at(entry.index);
+
+    if (fileName.empty()) {
+      printwarning("Skipped empty filename id: " << entry.index);
+      continue;
+    }
+
+    ctx->NewFile(fileName);
 
     dataRd.Seek(entry.dataOffset);
 
