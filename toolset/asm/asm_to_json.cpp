@@ -42,22 +42,31 @@ static AppInfo_s appInfo{
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-REFLECT(ENUMERATION(BC::ASMB::StateType),
-        EnumProxy("Animation", uint64(BC::ASMB::StateType::Animation)),
-        EnumProxy("Blend", uint64(BC::ASMB::StateType::Blend)),
-        EnumProxy("ExitAnim", uint64(BC::ASMB::StateType::ExitAnim)));
+namespace A1 = BC::ASMB::V1;
+namespace A2 = BC::ASMB::V2;
 
-REFLECT(ENUMERATION(BC::ASMB::TransitionType),
-        EnumProxy("Basic", uint64(BC::ASMB::TransitionType::Basic)),
-        EnumProxy("Span", uint64(BC::ASMB::TransitionType::Span)),
-        EnumProxy("Switch", uint64(BC::ASMB::TransitionType::Switch)));
+REFLECT(ENUMERATION(A1::StateType),
+        EnumProxy{"Animation", uint64(A1::StateType::Animation)},
+        EnumProxy{"Blend", uint64(A1::StateType::Blend)},
+        EnumProxy{"ExitAnim", uint64(A1::StateType::ExitAnim)});
 
-REFLECT(ENUMERATION(BC::ASMB::BlendType),
-        EnumProxy("Type1D", uint64(BC::ASMB::BlendType::Type1D)),
-        EnumProxy("Type1DBasis", uint64(BC::ASMB::BlendType::Type1DBasis)));
-REFLECT(ENUMERATION(BC::ASMB::VarParamType),
-        EnumProxy("Int", uint64(BC::ASMB::VarParamType::Int)),
-        EnumProxy("Float", uint64(BC::ASMB::VarParamType::Float)));
+REFLECT(ENUMERATION(A1::TransitionType),
+        EnumProxy{"Basic", uint64(A1::TransitionType::Basic)},
+        EnumProxy{"Span", uint64(A1::TransitionType::Span)},
+        EnumProxy{"Switch", uint64(A1::TransitionType::Switch)});
+
+REFLECT(ENUMERATION(A1::BlendType),
+        EnumProxy{"Type1D", uint64(A1::BlendType::Type1D)},
+        EnumProxy{"Type1DBasis", uint64(A1::BlendType::Type1DBasis)});
+
+REFLECT(ENUMERATION(A1::VarParamType),
+        EnumProxy{"Int", uint64(A1::VarParamType::Int)},
+        EnumProxy{"Float", uint64(A1::VarParamType::Float)});
+
+REFLECT(ENUMERATION(A2::StateType),
+        EnumProxy{"Animation", uint64(A2::StateType::Animation)},
+        EnumProxy{"Blend", uint64(A2::StateType::Blend)},
+        EnumProxy{"EffectsOnly", uint64(A2::StateType::EffectsOnly)});
 
 template <class E> const char *FromEnum(E en) {
   static auto refEnum = GetReflectedEnum<E>();
@@ -71,7 +80,7 @@ template <class E> const char *FromEnum(E en) {
   return refEnum->names[std::distance(refEnum->values, found)];
 }
 
-void ToJSON(BC::ASMB::StateFallback &f, nlohmann::json &jFallback) {
+void ToJSON(A1::StateFallback &f, nlohmann::json &jFallback) {
   jFallback["name"] = f.name;
   assert(f.unk00[0] < 2);
   assert(f.unk00[1] < 2);
@@ -89,31 +98,19 @@ void ToJSON(BC::ASMB::StateFallback &f, nlohmann::json &jFallback) {
   assert(f.null00[1] == 0);
 }
 
-void ToJSON(BC::ASMB::StateTransition *e, nlohmann::json &jChild) {
-  jChild["type"] = [&] {
-    static auto refEnum = GetReflectedEnum<BC::ASMB::TransitionType>();
-    auto found =
-        std::find(refEnum->values, refEnum->values + refEnum->numMembers,
-                  uint64(e->type));
-
-    if (found >= refEnum->values + refEnum->numMembers) {
-      assert(false);
-      return "< ??? >";
-    }
-    return refEnum->names[std::distance(refEnum->values, found)];
-  }();
-
-  auto OutSValue = [](BC::ASMB::SValue &sval, nlohmann::json &node) {
+void ToJSON(A1::StateTransition *e, nlohmann::json &jChild) {
+  jChild["type"] = FromEnum(e->type);
+  auto OutSValue = [](A1::SValue &sval, nlohmann::json &node) {
     node["targetState"] = sval.targetName;
     node["unk0"] = sval.unk00;
     node["unk1"] = sval.unk01;
   };
 
-  if (e->type == BC::ASMB::TransitionType::Basic) {
-    auto sval = static_cast<BC::ASMB::StateTransitionBasic *>(e);
+  if (e->type == A1::TransitionType::Basic) {
+    auto sval = static_cast<A1::StateTransitionBasic *>(e);
     OutSValue(*sval, jChild);
-  } else if (e->type == BC::ASMB::TransitionType::Span) {
-    auto sval = static_cast<BC::ASMB::StateTransitionSpans *>(e);
+  } else if (e->type == A1::TransitionType::Span) {
+    auto sval = static_cast<A1::StateTransitionSpans *>(e);
     auto &subs = jChild["spans"];
 
     for (size_t index = 0; auto &s : sval->spans) {
@@ -134,8 +131,8 @@ void ToJSON(BC::ASMB::StateTransition *e, nlohmann::json &jChild) {
       assert(s.null01[1] == 0);
     }
 
-  } else if (e->type == BC::ASMB::TransitionType::Switch) {
-    auto sval = static_cast<BC::ASMB::StateTransitionSwitch *>(e);
+  } else if (e->type == A1::TransitionType::Switch) {
+    auto sval = static_cast<A1::StateTransitionSwitch *>(e);
     jChild["varParamIndex"] = sval->varParamIndex;
     auto &subs = jChild["cases"];
 
@@ -150,7 +147,7 @@ void ToJSON(BC::ASMB::StateTransition *e, nlohmann::json &jChild) {
   }
 }
 
-void ToJSON(BC::ASMB::StateAnim *animState, nlohmann::json &jState) {
+void ToJSON(A1::StateAnim *animState, nlohmann::json &jState) {
   jState["animFilename"] = animState->animFilename;
   jState["groupFolderIndex"] = animState->groupFolderIndex;
   jState["isMirrored"] = animState->isMirrored;
@@ -160,31 +157,99 @@ void ToJSON(BC::ASMB::StateAnim *animState, nlohmann::json &jState) {
   assert(animState->null00 == 0);
 }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
+void ToJSON(A2::StateAnim *animState, nlohmann::json &jState) {
+  jState["animFilename"] = animState->animFilename;
+  if (animState->joint) {
+    jState["joint"] = animState->joint;
+  }
 
-  {
-    BC::Header hdr;
-    rd.Push();
-    rd.Read(hdr);
-    rd.Pop();
+  assert(animState->null0 == 0);
+  jState["unkInt0"] = animState->unk;
+  jState["unkFloats"] = animState->unkf;
+}
 
-    if (hdr.id != BC::ID) {
-      throw es::InvalidHeaderError(hdr.id);
+void ToJSON(A2::EVAAnim *animState, nlohmann::json &jState) {
+  jState["animFilename"] = animState->animFilename;
+  if (animState->joint) {
+    jState["joint"] = animState->joint;
+  }
+
+  jState["unkInt0"] = animState->unk;
+  jState["unkFloats"] = animState->unkf;
+}
+
+void ToJSON(A2::StateTransition *tran, nlohmann::json &jCond) {
+  jCond["targetState"] = tran->targetName;
+  jCond["unkFloats0"] = tran->unk;
+  assert(tran->pad0 == -1U);
+  assert(tran->pad1 == -1U);
+  jCond["unkFloats1"] = tran->unk0;
+  jCond["unkInt0"] = tran->unk1;
+  jCond["unkInts0"] = tran->unk2;
+  jCond["unkInt1"] = tran->unk4;
+  jCond["unkInt2"] = tran->unk5;
+}
+
+template <class C>
+void ParseChildren(C *f, nlohmann::json &jState, nlohmann::json &main) {
+  auto &jChildren = jState["children"];
+  auto &jConds = main["conditions"];
+
+  for (size_t index = 0; auto e : f->children) {
+    nlohmann::json node;
+    ToJSON(e, node);
+
+    if (!jConds.contains(e->name)) {
+      jConds[e->name] = std::move(node);
+      jChildren[index++] = e->name;
+    } else {
+      auto &mNode = jConds[e->name];
+
+      if (mNode.is_array()) {
+        int32 foundIndex = -1;
+
+        for (auto &n : mNode) {
+          if (node == n) {
+            break;
+          }
+          foundIndex++;
+        }
+
+        if (foundIndex < 0) {
+          foundIndex = mNode.size();
+          mNode.emplace_back(std::move(node));
+        }
+
+        std::string nName = e->name;
+        nName.push_back('[');
+        nName.append(std::to_string(foundIndex));
+        nName.push_back(']');
+        jChildren[index++] = std::move(nName);
+
+      } else {
+        if (node != mNode) {
+          nlohmann::json nNode;
+          nNode.emplace_back(std::move(mNode));
+          nNode.emplace_back(std::move(node));
+          jConds[e->name] = std::move(nNode);
+
+          std::string nName = e->name;
+          nName.append("[1]");
+          jChildren[index++] = std::move(nName);
+        } else {
+          jChildren[index++] = e->name;
+        }
+      }
     }
   }
+}
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
-  BC::Header *hdr = reinterpret_cast<BC::Header *>(buffer.data());
-  ProcessClass(*hdr, {});
-
-  if (hdr->data->id != BC::ASMB::ID) {
-    throw es::InvalidHeaderError(hdr->data->id);
+void ToJSON(A1::Assembly *asmb, nlohmann::json &main) {
+  main["schemaVersion"] = 1;
+  main["formatVersion"] = 1;
+  if (asmb->skeletonFilename) {
+    main["skeletonFilename"] = asmb->skeletonFilename;
   }
-
-  nlohmann::json main;
-  auto asmb = static_cast<BC::ASMB::Header *>(hdr->data)->ass;
 
   if (asmb->groupFolders.numItems) {
     auto &jFolders = main["groupFolders"];
@@ -235,7 +300,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       jState["type"] = FromEnum(f->type);
       jState["unk"] = f->unk0;
 
-      auto OutStateKV = [](auto &node, BC::ASMB::StateKeyValue &kv) {
+      auto OutStateKV = [](auto &node, A1::StateKeyValue &kv) {
         node["name"] = kv.name;
         assert(kv.unk == 1);
         if (kv.value) {
@@ -276,68 +341,19 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       }
 
       if (f->children.numItems) {
-        auto &jChildren = jState["children"];
-        auto &jConds = main["conditions"];
-
-        for (size_t index = 0; auto e : f->children) {
-          nlohmann::json node;
-          ToJSON(e, node);
-
-          if (!jConds.contains(e->name)) {
-            jConds[e->name] = std::move(node);
-            jChildren[index++] = e->name;
-          } else {
-            auto &mNode = jConds[e->name];
-
-            if (mNode.is_array()) {
-              int32 foundIndex = -1;
-
-              for (auto &n : mNode) {
-                if (node == n) {
-                  break;
-                }
-                foundIndex++;
-              }
-
-              if (foundIndex < 0) {
-                foundIndex = mNode.size();
-                mNode.emplace_back(std::move(node));
-              }
-
-              std::string nName = e->name;
-              nName.push_back('[');
-              nName.append(std::to_string(foundIndex));
-              nName.push_back(']');
-              jChildren[index++] = std::move(nName);
-
-            } else {
-              if (node != mNode) {
-                nlohmann::json nNode;
-                nNode.emplace_back(std::move(mNode));
-                nNode.emplace_back(std::move(node));
-                jConds[e->name] = std::move(nNode);
-
-                std::string nName = e->name;
-                nName.append("[1]");
-                jChildren[index++] = std::move(nName);
-              } else {
-                jChildren[index++] = e->name;
-              }
-            }
-          }
-        }
+        ParseChildren(f, jState, main);
       }
 
-      if (f->type == BC::ASMB::StateType::Animation) {
-        auto animState = static_cast<BC::ASMB::StateAnimation *>(f);
+      if (f->type == A1::StateType::Animation) {
+        auto animState = static_cast<A1::StateAnimation *>(f);
         ToJSON(animState, jState);
-      } else if (f->type == BC::ASMB::StateType::Blend) {
-        auto blend = static_cast<BC::ASMB::StateBlend *>(f)->blend;
+      } else if (f->type == A1::StateType::Blend) {
+        auto blend = static_cast<A1::StateBlend *>(f)->blend;
         jState["blendType"] = FromEnum(blend->type);
         jState["varParamIndex"] = blend->varParamIndex;
 
-        if (blend->type == BC::ASMB::BlendType::Type1D) {
-          auto blend1D = static_cast<BC::ASMB::Blend1D *>(blend);
+        if (blend->type == A1::BlendType::Type1D) {
+          auto blend1D = static_cast<A1::Blend1D *>(blend);
           auto &jAnims = jState["blends"];
 
           for (size_t index = 0; auto &b : blend1D->blends) {
@@ -345,8 +361,8 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
             jAnim["triggerValue"] = b.triggerValue;
             ToJSON(&b.anim, jAnim);
           }
-        } else if (blend->type == BC::ASMB::BlendType::Type1DBasis) {
-          auto blend1D = static_cast<BC::ASMB::Blend1DBasis *>(blend);
+        } else if (blend->type == A1::BlendType::Type1DBasis) {
+          auto blend1D = static_cast<A1::Blend1DBasis *>(blend);
           auto &jBlends = jState["blends"];
           assert(blend1D->anims.numItems == 1);
 
@@ -358,8 +374,8 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
             ToJSON(&b.anim, jAnim);
           }
         }
-      } else if (f->type == BC::ASMB::StateType::ExitAnim) {
-        auto animState = static_cast<BC::ASMB::StateExitAnim *>(f);
+      } else if (f->type == A1::StateType::ExitAnim) {
+        auto animState = static_cast<A1::StateExitAnim *>(f);
         jState["animFilename"] = animState->animFilename;
         jState["groupFolderIndex"] = animState->groupFolderIndex;
         jState["unkInt0"] = animState->unk01;
@@ -370,6 +386,185 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       }
     }
   }
+}
+
+void ToJSON(A2::StateBlendedAnimation *anim, nlohmann::json &node) {
+  node["unk1"] = anim->unk1;
+  node["triggerValue"] = anim->triggerValue;
+  node["varParamIndex"] = anim->varParamIndex;
+  node["type"] = anim->type;
+  assert(anim->null00 == 0);
+
+  if (anim->blendAnims.numItems) {
+    auto &jExits = node["blendAnims"];
+
+    for (size_t index = 0; auto &e : anim->blendAnims) {
+      auto &jExit = jExits[index++];
+      ToJSON(&e.anim, jExit);
+      jExit["triggerValue"] = e.triggerValue;
+      jExit["unkBool"] = e.unk;
+    }
+  }
+
+  if (anim->subBlends.numItems) {
+    auto &jExits = node["subBlends"];
+    for (size_t index = 0; auto &e : anim->subBlends) {
+      ToJSON(e, jExits[index++]);
+    }
+  }
+}
+
+void ToJSON(A2::EventData &evt, nlohmann::json &main) {
+  assert(evt.null0 == 0);
+  assert(evt.null1 == 0);
+  assert(evt.null2 == 0);
+  assert(evt.null3 == 0);
+  assert(evt.null4 == 0);
+  assert(evt.null5 == 0);
+  assert(evt.null6 == 0);
+  assert(evt.pad == -1U);
+  main["unkInts0"] = evt.unk0;
+  main["unkFloat0"] = evt.unk1;
+  main["unkFloat1"] = evt.unk2;
+  main["unkFloat2"] = evt.unk3;
+  main["unkFloat3"] = evt.unk4;
+  main["unkFloat4"] = evt.unk5;
+  main["unkFloat5"] = evt.unk6;
+  main["unkInt0"] = evt.unk7;
+}
+
+void ToJSON(A2::Assembly *asmb, nlohmann::json &main) {
+  main["schemaVersion"] = 1;
+  main["formatVersion"] = 2;
+
+  assert(asmb->null00 == 0);
+  assert(asmb->arr0.numItems == 0);
+
+  if (asmb->groupFolders.numItems) {
+    auto &jFolders = main["groupFolders"];
+    for (auto f : asmb->groupFolders) {
+      jFolders.emplace_back(f);
+    }
+  }
+
+  if (asmb->fsmGroups.numItems) {
+    auto &jStateGroups = main["stateGroups"];
+
+    for (auto &s : asmb->fsmGroups) {
+      auto &jStateGroup = jStateGroups[s.groupName];
+      jStateGroup["entryState"] = s.stateName;
+      if (s.sName) {
+        jStateGroup["prefixName"] = s.sName;
+      }
+
+      if (s.stateGraph.numItems) {
+        auto &jStateNodes = jStateGroup["stateNodes"];
+        for (size_t index = 0; auto f : s.stateGraph) {
+          auto &jState = jStateNodes[index];
+          jState["id"] = index++;
+          jState["name"] = f->name;
+          jState["type"] = FromEnum(f->type);
+
+          if (f->children.numItems) {
+            ParseChildren(f, jState, main);
+          }
+
+          if (f->anims.numItems) {
+            auto &jAnims = jState["additionalAnims"];
+
+            for (size_t index = 0; auto &a : f->anims) {
+              ToJSON(&a, jAnims[index++]);
+            }
+          }
+
+          if (f->evaAnims.numItems) {
+            auto &jAnims = jState["evaAnims"];
+
+            for (size_t index = 0; auto &a : f->evaAnims) {
+              ToJSON(&a, jAnims[index++]);
+            }
+          }
+
+          if (f->enterEvents.numItems) {
+            auto &jStartEvents = jState["enterEvents"];
+
+            for (size_t index_ = 0; auto c : f->enterEvents) {
+              auto &jStartEvent = jStartEvents[index_++];
+              ToJSON(c, jStartEvent);
+            }
+          }
+
+          if (f->exitEvents.numItems) {
+            auto &jEndEvents = jState["exitEvents"];
+
+            for (size_t index = 0; auto c : f->exitEvents) {
+              auto &jEndEvent = jEndEvents[index++];
+              ToJSON(c, jEndEvent);
+            }
+          }
+
+          if (f->events.numItems) {
+            auto &jEvents = jState["events"];
+
+            for (size_t index = 0; auto e : f->events) {
+              auto &jEvent = jEvents[index++];
+              jEvent["triggerFrame"] = e.triggerFrame;
+              jEvent["unkFrame"] = e.unkFrame;
+              ToJSON(e.data, jEvent);
+            }
+          }
+
+          if (f->type == A2::StateType::Animation) {
+            auto animState = static_cast<A2::StateAnimation *>(f);
+            ToJSON(animState, jState);
+          } else if (f->type == A2::StateType::Blend) {
+            auto animState = static_cast<A2::StateBlendedAnimations *>(f);
+            auto &jAnims = jState["anims"];
+
+            for (size_t index = 0; auto a : animState->anims) {
+              ToJSON(a, jAnims[index++]);
+            }
+          }
+        }
+      }
+
+      if (s.exportedConditions.numItems) {
+        auto &jConds = jStateGroup["exportedConditions"];
+        for (size_t index = 0; auto f : s.exportedConditions) {
+          ToJSON(f, jConds[index++]);
+        }
+      }
+    }
+  }
+}
+
+void AppProcessFile(std::istream &stream, AppContext *ctx) {
+  BinReaderRef rd(stream);
+
+  {
+    BC::Header hdr;
+    rd.Push();
+    rd.Read(hdr);
+    rd.Pop();
+
+    if (hdr.id != BC::ID) {
+      throw es::InvalidHeaderError(hdr.id);
+    }
+  }
+
+  std::string buffer;
+  rd.ReadContainer(buffer, rd.GetSize());
+  BC::Header *hdr = reinterpret_cast<BC::Header *>(buffer.data());
+  ProcessClass(*hdr, {});
+
+  if (hdr->data->id != BC::ASMB::ID) {
+    throw es::InvalidHeaderError(hdr->data->id);
+  }
+
+  nlohmann::json main;
+  auto asmb = static_cast<BC::ASMB::Header *>(hdr->data);
+
+  std::visit([&main](auto v) { ToJSON(v, main); }, asmb->Get());
 
   AFileInfo outPath(ctx->outFile);
   BinWritter_t<BinCoreOpenMode::Text> wr(
