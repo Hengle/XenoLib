@@ -120,19 +120,19 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
   }
 
   if constexpr (DEV_EXTRACT_MODEL) {
-    std::string main = cache.GetSet(*streams, 0);
+    const char *main = cache.GetSet(*streams, 0);
 
     {
       ctx->NewFile("vertexindexbuffer");
       auto &entry = entries[resources->modelStreamEntryIndex];
-      es::string_view viStream(main.data() + entry.offset, entry.size);
+      es::string_view viStream(main + entry.offset, entry.size);
       ctx->SendData(viStream);
     }
 
     {
       ctx->NewFile("shaders.wishp");
       auto &entry = entries[resources->shaderStreamEntryIndex];
-      es::string_view shStream(main.data() + entry.offset, entry.size);
+      es::string_view shStream(main + entry.offset, entry.size);
       ctx->SendData(shStream);
     }
 
