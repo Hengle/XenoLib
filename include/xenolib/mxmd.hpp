@@ -24,13 +24,26 @@
 namespace MXMD {
 class Impl;
 
+class Morph : public uni::VertexArray {
+public:
+  virtual es::string_view Name() const = 0;
+  virtual size_t TargetVertexArrayIndex() const = 0;
+};
+
+using Morphs = uni::List<Morph>;
+
+class Model : public uni::Model {
+  public:
+  virtual const Morphs *MorphTargets() const = 0;
+};
+
 class XN_EXTERN Wrap {
 public:
   Wrap();
   Wrap(Wrap &&);
   ~Wrap();
   operator const uni::Skeleton *();
-  operator const uni::Model *();
+  operator const Model *();
 
   enum class ExcludeLoad {
     Model,
@@ -42,7 +55,8 @@ public:
 
   using ExcludeLoads = es::Flags<ExcludeLoad>;
 
-  void Load(BinReaderRef main, BinReaderRef stream, ExcludeLoads excludeLoads = {});
+  void Load(BinReaderRef main, BinReaderRef stream,
+            ExcludeLoads excludeLoads = {});
 
 private:
   friend class WrapFriend;

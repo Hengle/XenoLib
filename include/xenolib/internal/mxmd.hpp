@@ -36,6 +36,16 @@ template <class C> struct Array {
   void Fixup(const char *base) { items.Fixup(base); }
 };
 
+template <class C> struct ArrayInv {
+  uint32 numItems;
+  Pointer<C> items;
+
+  C *begin() { return items; }
+  C *end() { return begin() + numItems; }
+
+  void Fixup(const char *base) { items.Fixup(base); }
+};
+
 template <es::IsFixable... C>
 void FixupAndProcess(ProcessFlags flags, C &...item) {
   (
@@ -78,8 +88,6 @@ enum class VertexDescriptorType : uint16 {
   REFLECTION, // NoFunc
   WEIGHT16 = 41,
   BONEID2,
-  NORMALMORPH,
-  MORPHVERTEXID
 };
 
 struct VertexType {

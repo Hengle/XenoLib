@@ -19,17 +19,21 @@
 
 namespace V3 {
 struct Primitive {
-  uint32 ID;
-  uint32 skinDescriptor;
+  uint32 drawFlags;
+  uint16 skinFlags;
+  uint16 null02;
   uint16 bufferID;
-  uint16 UVFacesID;
-  uint16 unk00;
+  uint16 meshFacesID;
+  uint16 groupID;
   uint16 materialID;
   uint32 null00[3];
   uint16 unk01;
-  uint16 LOD;
-  uint32 meshFacesID;
-  uint32 null01[3];
+  uint8 LOD;
+  uint8 unk02;
+  uint16 unk03;
+  uint16 unk04;
+  int32 parentPrimitive;
+  uint32 null01[2];
 };
 
 struct Mesh {
@@ -40,21 +44,27 @@ struct Mesh {
   float boundingRadius;
 };
 
+enum class BoneTMType : uint32 {
+  Null,
+  Unk, // Local?
+  Global,
+};
+
 struct Bone {
   String name;
-  float unk00;
-  uint32 unk01;
-  uint32 ID;
+  float boundingRadius;
+  BoneTMType tmType;
+  uint32 tmId;
   uint32 null[2];
 };
 
 struct Skin {
   uint32 count1;
   uint32 count2;
-  Pointer<Bone> nodesOffset;
-  Pointer<TransformMatrix> nodeTMSOffset;
-  uint32 unkOffset00;
-  uint32 unkOffset01;
+  Pointer<Bone> nodes;
+  Pointer<TransformMatrix> nodeIBMs;
+  Pointer<char> nodeTMs0;
+  Pointer<char> nodeTMs1;
 };
 
 struct MorphControl {
@@ -134,12 +144,12 @@ struct IndexBuffer : V1::IndexBuffer {
 };
 
 struct WeightPalette {
-  uint32 baseOffset;
-  uint32 offsetID;
+  uint32 bufferVertexBegin;
+  uint32 vertexIndexSubstract;
   uint32 count;
   uint32 unk00[4];
-  uint8 unk01;
-  uint8 lod;
+  uint8 indexWithinMergeTable;
+  uint8 mergeTableIndex;
   uint16 unk02;
   uint32 unk03[2];
 };
@@ -153,24 +163,26 @@ struct MorphBuffer {
 };
 
 struct MorphDescriptor {
-  uint32 vertexBufferIndex;
-  uint32 bufferIndexBegin;
-  uint32 numBuffers;
-  Pointer<uint16> targetIds;
+  uint32 vertexBufferTargetIndex;
+  uint32 morphBufferBeginIndex;
+  ArrayInv<uint16> morphIDs;
   uint32 unk01;
 };
 
 struct MorphsHeader {
-  Array<MorphDescriptor> descs;
-  Array<MorphBuffer> buffers;
+  ArrayInv<MorphDescriptor> descs;
+  ArrayInv<MorphBuffer> buffers;
 };
 
-struct BufferManager {
-  uint32 numWeightPalettes;
-  Pointer<WeightPalette> weightPalettes;
+struct MergeTable {
+  uint16 paletteIndex[9];
+};
+
+struct SkinManager {
+  ArrayInv<WeightPalette> weightPalettes;
   uint16 weightBufferID;
-  uint16 flags;
-  Pointer<MorphsHeader> morph;
+  uint16 numLODs;
+  Pointer<MergeTable> lodMergeTables;
 };
 
 struct Stream {
@@ -181,11 +193,11 @@ struct Stream {
   uint32 unk01;
   uint32 unkOffset00;
   uint32 unkCount00;
-  uint32 unk02;
+  Pointer<MorphsHeader> morphs;
   uint32 bufferSize;
   uint32 bufferOffset;
   uint32 voxelizedModelOffset;
-  Pointer<BufferManager> bufferManager;
+  Pointer<SkinManager> skinManager;
 };
 
 struct Header : HeaderBase {

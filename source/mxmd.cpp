@@ -20,7 +20,9 @@
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
 #include "uni/list_vector.hpp"
+#include "xenolib/drsm.hpp"
 #include "xenolib/internal/mxmd.hpp"
+#include <cassert>
 
 namespace MXMD {
 
@@ -31,8 +33,11 @@ VertexType::operator uni::FormatDescr() const {
   case VertexDescriptorType::WEIGHT32:
     return {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
   case VertexDescriptorType::NORMAL:
+  case VertexDescriptorType::TANGENT:
   case VertexDescriptorType::NORMAL2:
     return {uni::FormatType::NORM, uni::DataType::R8G8B8A8};
+  case VertexDescriptorType::TANGENT16:
+    return {uni::FormatType::NORM, uni::DataType::R16G16B16A16};
   case VertexDescriptorType::BONEID:
   case VertexDescriptorType::BONEID2:
     return {uni::FormatType::UINT, uni::DataType::R8G8B8A8};
@@ -46,10 +51,6 @@ VertexType::operator uni::FormatDescr() const {
     return {uni::FormatType::FLOAT, uni::DataType::R32G32};
   case VertexDescriptorType::WEIGHT16:
     return {uni::FormatType::UNORM, uni::DataType::R16G16B16A16};
-  case VertexDescriptorType::MORPHVERTEXID:
-    return {uni::FormatType::UINT, uni::DataType::R32};
-  case VertexDescriptorType::NORMALMORPH:
-    return {uni::FormatType::UNORM, uni::DataType::R8G8B8A8};
   default:
     throw std::runtime_error("Unhandled vertex type");
   }
@@ -63,7 +64,6 @@ VertexType::operator uni::PrimitiveDescriptor::Usage_e() const {
   case VertexDescriptorType::NORMAL32:
   case VertexDescriptorType::NORMAL:
   case VertexDescriptorType::NORMAL2:
-  case VertexDescriptorType::NORMALMORPH:
     return ut::Normal;
   case VertexDescriptorType::WEIGHT32:
   case VertexDescriptorType::WEIGHT16:
@@ -72,7 +72,6 @@ VertexType::operator uni::PrimitiveDescriptor::Usage_e() const {
   case VertexDescriptorType::BONEID2:
     return ut::BoneIndices;
   case VertexDescriptorType::WEIGHTID:
-  case VertexDescriptorType::MORPHVERTEXID:
     return ut::VertexIndex;
   case VertexDescriptorType::VERTEXCOLOR:
     return ut::VertexColor;
@@ -80,6 +79,9 @@ VertexType::operator uni::PrimitiveDescriptor::Usage_e() const {
   case VertexDescriptorType::UV2:
   case VertexDescriptorType::UV3:
     return ut::TextureCoordiante;
+  case VertexDescriptorType::TANGENT:
+  case VertexDescriptorType::TANGENT16:
+    return ut::Tangent;
   default:
     throw std::runtime_error("Unhandled vertex type");
   }
@@ -110,10 +112,11 @@ struct PrimitiveDescriptor : uni::PrimitiveDescriptor {
 };
 } // namespace
 
-struct VertexBuffer {
+struct VertexBuffer : uni::VertexArray {
   uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
+  size_t numVertices = 0;
 
-  VertexBuffer(V1::VertexBuffer &buff) {
+  VertexBuffer(V1::VertexBuffer &buff) : numVertices(buff.data.numItems) {
     descs.storage.reserve(buff.descriptors.numItems);
     PrimitiveDescriptor desc;
     desc.buffer = buff.data.items;
@@ -128,14 +131,9 @@ struct VertexBuffer {
       desc.index = [&] {
         switch (d.type) {
         case VertexDescriptorType::UV2:
-        case VertexDescriptorType::MORPHVERTEXID:
           return 1;
         case VertexDescriptorType::UV3:
           return 2;
-        case VertexDescriptorType::NORMALMORPH:
-          desc.unpackType = uni::PrimitiveDescriptor::UnpackDataType_e::Add;
-          desc.unpack = -0.5f;
-          return 0;
         default:
           return 0;
         }
@@ -143,6 +141,51 @@ struct VertexBuffer {
 
       descs.storage.emplace_back(desc);
     }
+  }
+
+  void AppendMorphBuffer(V3::MorphBuffer *buff, char *buffer) {
+    PrimitiveDescriptor desc{};
+    desc.buffer = buffer + buff->vertexBufferOffset;
+    desc.stride = buff->stride;
+
+    desc.usage = uni::PrimitiveDescriptor::Usage_e::Position;
+    desc.type = {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
+    descs.storage.emplace_back(desc);
+
+    desc.usage = uni::PrimitiveDescriptor::Usage_e::Normal;
+    desc.unpackType = uni::PrimitiveDescriptor::UnpackDataType_e::Add;
+    desc.unpack = -0.5f;
+    desc.offset = 12;
+    desc.type = {uni::FormatType::UNORM, uni::DataType::R8G8B8A8};
+    descs.storage.emplace_back(desc);
+  }
+
+  uni::PrimitiveDescriptorsConst Descriptors() const override {
+    return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
+                                                                   false);
+  }
+  size_t NumVertices() const override { return numVertices; }
+
+  operator uni::Element<const uni::VertexArray>() const {
+    return uni::Element<const uni::VertexArray>{this, false};
+  }
+};
+
+struct IndexBuffer : uni::IndexArray {
+  uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
+  V1::IndexBuffer *buffer;
+
+  IndexBuffer(V1::IndexBuffer &buff) : buffer(&buff) {}
+
+  const char *RawIndexBuffer() const override {
+    return reinterpret_cast<const char *>(buffer->indices.items.Get());
+  }
+
+  size_t IndexSize() const override { return 2; }
+  size_t NumIndices() const override { return buffer->indices.numItems; }
+
+  operator uni::Element<const uni::IndexArray>() const {
+    return uni::Element<const uni::IndexArray>{this, false};
   }
 };
 } // namespace MXMD
@@ -325,17 +368,13 @@ template <>
 void XN_EXTERN ProcessClass(V1::VertexBuffer &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
+  flags.NoLittleEndian();
 
-  if (flags == ProcessFlag::EnsureBigEndian) {
-    FByteswapper(item);
-  }
+  FByteswapper(item);
 
   item.data.Fixup(flags.base);
   item.descriptors.Fixup(flags.base);
 
-  if (flags != ProcessFlag::EnsureBigEndian) {
-    return;
-  }
   for (auto &d : item.descriptors) {
     FByteswapper(d);
   }
@@ -374,19 +413,13 @@ void XN_EXTERN ProcessClass(V1::VertexBuffer &item, ProcessFlags flags) {
         FByteswapper(*reinterpret_cast<SVector4 *>(bufBegin));
       }
       break;
-    case VertexDescriptorType::MORPHVERTEXID:
-      for (size_t i = 0; i < numVerts; i++) {
-        char *bufBegin = buffer + item.stride * i;
-        FByteswapper(*reinterpret_cast<uint32 *>(bufBegin));
-      }
-      break;
     case VertexDescriptorType::NORMAL:
     case VertexDescriptorType::NORMAL2:
     case VertexDescriptorType::TANGENT:
     case VertexDescriptorType::BONEID:
     case VertexDescriptorType::BONEID2:
     case VertexDescriptorType::VERTEXCOLOR:
-    case VertexDescriptorType::NORMALMORPH:
+    // case VertexDescriptorType::NORMALMORPH:
     case VertexDescriptorType::REFLECTION:
       break;
     default:
@@ -401,16 +434,13 @@ template <>
 void XN_EXTERN ProcessClass(V1::IndexBuffer &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
+  flags.NoLittleEndian();
 
-  if (flags == ProcessFlag::EnsureBigEndian) {
-    FByteswapper(item);
-  }
+  FByteswapper(item);
   item.indices.Fixup(flags.base);
 
-  if (flags == ProcessFlag::EnsureBigEndian) {
-    for (auto &i : item.indices) {
-      FByteswapper(i);
-    }
+  for (auto &i : item.indices) {
+    FByteswapper(i);
   }
 }
 
@@ -494,13 +524,19 @@ void XN_EXTERN ProcessClass(V3::SMTHeader &item, ProcessFlags flags) {
 template <>
 void XN_EXTERN ProcessClass(V3::VertexBuffer &item, ProcessFlags flags) {
   flags.NoBigEndian();
-  ProcessClass<V1::VertexBuffer>(item, flags);
+  flags.NoAutoDetect();
+  flags.NoProcessDataOut();
+
+  item.data.items.FixupRelative(flags.base + flags.userData);
+  item.descriptors.Fixup(flags.base);
 }
 
 template <>
 void XN_EXTERN ProcessClass(V3::IndexBuffer &item, ProcessFlags flags) {
   flags.NoBigEndian();
-  ProcessClass<V1::IndexBuffer>(item, flags);
+  flags.NoAutoDetect();
+  flags.NoProcessDataOut();
+  item.indices.items.FixupRelative(flags.base + flags.userData);
 }
 
 template <>
@@ -509,7 +545,7 @@ void XN_EXTERN ProcessClass(V3::MorphDescriptor &item, ProcessFlags flags) {
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
 
-  item.targetIds.Fixup(flags.base);
+  item.morphIDs.Fixup(flags.base);
 }
 
 template <>
@@ -519,20 +555,19 @@ void XN_EXTERN ProcessClass(V3::MorphsHeader &item, ProcessFlags flags) {
   flags.NoAutoDetect();
 
   es::FixupPointers(flags.base, item.descs, item.buffers);
+
+  for (auto &d : item.descs) {
+    ProcessClass(d, flags);
+  }
 }
 
 template <>
-void XN_EXTERN ProcessClass(V3::BufferManager &item, ProcessFlags flags) {
+void XN_EXTERN ProcessClass(V3::SkinManager &item, ProcessFlags flags) {
   flags.NoBigEndian();
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
 
-  es::FixupPointers(flags.base, item.weightPalettes, item.morph);
-
-  if (item.morph) {
-    // todo item.morph correct offset
-    // ProcessClass(*item.morph, flags);
-  }
+  es::FixupPointers(flags.base, item.weightPalettes, item.lodMergeTables);
 }
 
 template <> void XN_EXTERN ProcessClass(V3::Stream &item, ProcessFlags flags) {
@@ -542,8 +577,9 @@ template <> void XN_EXTERN ProcessClass(V3::Stream &item, ProcessFlags flags) {
   flags.base = reinterpret_cast<char *>(&item);
 
   es::FixupPointers(flags.base, item.vertexBuffers, item.indexBuffers,
-                    item.bufferManager);
+                    item.skinManager, item.morphs);
 
+  flags.userData = item.bufferOffset;
   for (auto &v : item.vertexBuffers) {
     ProcessClass(v, flags);
   }
@@ -552,8 +588,12 @@ template <> void XN_EXTERN ProcessClass(V3::Stream &item, ProcessFlags flags) {
     ProcessClass(i, flags);
   }
 
-  if (item.bufferManager) {
-    ProcessClass(*item.bufferManager, flags);
+  if (item.skinManager) {
+    ProcessClass(*item.skinManager, flags);
+  }
+
+  if (item.morphs) {
+    ProcessClass(*item.morphs, flags);
   }
 }
 
@@ -575,7 +615,17 @@ template <> void XN_EXTERN ProcessClass(V3::Skin &item, ProcessFlags flags) {
   flags.NoBigEndian();
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
-  es::FixupPointers(flags.base, item.nodesOffset, item.nodeTMSOffset);
+  flags.base = reinterpret_cast<char *>(&item);
+  es::FixupPointers(flags.base, item.nodes, item.nodeIBMs, item.nodeTMs0,
+                    item.nodeTMs1);
+  assert(item.count1 == item.count2);
+  assert(item.nodeTMs0.Get() == item.nodeTMs1.Get());
+
+  V3::Bone *nodes = item.nodes;
+
+  for (size_t b = 0; b < item.count1; b++) {
+    ProcessClass(nodes[b], flags);
+  }
 }
 
 template <>
@@ -590,6 +640,7 @@ template <> void XN_EXTERN ProcessClass(V3::Morphs &item, ProcessFlags flags) {
   flags.NoBigEndian();
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
+  flags.base = reinterpret_cast<char *>(&item);
   item.controls.Fixup(flags.base);
 
   for (auto &c : item.controls) {
@@ -601,6 +652,7 @@ template <> void XN_EXTERN ProcessClass(V3::Model &item, ProcessFlags flags) {
   flags.NoBigEndian();
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
+  flags.base = reinterpret_cast<char *>(&item);
   es::FixupPointers(flags.base, item.meshes, item.morphs, item.skin);
 
   for (auto &c : item.meshes) {
@@ -730,12 +782,15 @@ template <> void XN_EXTERN ProcessClass(V3::Header &item, ProcessFlags flags) {
   Wrap::ExcludeLoads exLoads = static_cast<Wrap::ExcludeLoads>(flags.userData);
   es::FixupPointers(flags.base, item.models, item.materials, item.streams,
                     item.shaders, item.cachedTextures, item.uncachedTextures);
+  assert(!item.cachedTextures);
+  assert(!item.streams);
+  assert(!item.shaders);
 
   if (exLoads != Wrap::ExcludeLoad::Model && item.models) {
     ProcessClass(*item.models, flags);
-    if (item.streams) {
+    /*if (item.streams) {
       ProcessClass(*item.streams, flags);
-    }
+    }*/
   } else {
     item.models.Reset();
     item.streams.Reset();
@@ -754,7 +809,7 @@ template <> void XN_EXTERN ProcessClass(V3::Header &item, ProcessFlags flags) {
   }
 
   if (exLoads != Wrap::ExcludeLoad::LowTextures && item.cachedTextures) {
-    ProcessClass(*item.cachedTextures, flags);
+    // ProcessClass(*item.cachedTextures, flags);
   } else {
     item.cachedTextures.Reset();
   }
@@ -852,34 +907,19 @@ struct Skeleton : uni::Skeleton {
   std::string Name() const override { return {}; }
 };
 
-class Primitive : public uni::Primitive, public VertexBuffer {
+class Primitive : public uni::Primitive {
 public:
-  using VertexBuffer::VertexBuffer;
   V1::Primitive *main;
-  V1::IndexBuffer *indexBuffer;
-  V1::VertexBuffer *vertexBuffer;
 
-  const char *RawIndexBuffer() const override {
-    return reinterpret_cast<const char *>(indexBuffer->indices.items.Get());
-  }
-  const char *RawVertexBuffer(size_t) const override {
-    return vertexBuffer->data.items.Get();
-  }
-  uni::PrimitiveDescriptorsConst Descriptors() const override {
-    return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
-                                                                   false);
-  }
-  IndexType_e IndexType() const override { return IndexType_e::Triangle; }
-  size_t IndexSize() const override { return 2; }
-  size_t NumVertices() const override {
-    return vertexBuffer->data.numItems / vertexBuffer->stride;
-  }
-  size_t NumVertexBuffers() const override { return 1; }
-  size_t NumIndices() const override { return indexBuffer->indices.numItems; }
+  Primitive(V1::Primitive &prim) : main(&prim) {}
   std::string Name() const override { return {}; }
   size_t SkinIndex() const override { return 0; }
-  size_t LODIndex() const override { return 0; }
+  int64 LODIndex() const override { return 0; }
   size_t MaterialIndex() const override { return main->materialID; }
+  size_t VertexArrayIndex(size_t id) const override { return main->bufferID; }
+  size_t IndexArrayIndex() const override { return main->meshFacesID; }
+  IndexType_e IndexType() const override { return IndexType_e::Triangle; }
+  size_t NumVertexArrays() const override { return 1; }
 
   operator uni::Element<const uni::Primitive>() const {
     return uni::Element<const uni::Primitive>{this, false};
@@ -920,26 +960,31 @@ public:
   }
 };
 
-class Model : public uni::Model {
+class V1Model : public Model {
 public:
   uni::VectorList<uni::Primitive, Primitive> primitives;
   uni::VectorList<uni::Skin, Skin> skins;
   uni::VectorList<uni::Material, Material> materials;
+  uni::VectorList<uni::VertexArray, VertexBuffer> vertexArrays;
+  uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
 
-  Model() = default;
-  Model(V1::Header &main) {
+  V1Model() = default;
+  V1Model(V1::Header &main) {
     auto model = main.models.Get();
     auto streams = main.streams.Get();
     auto mats = main.materials.Get();
 
+    for (auto &v : streams->vertexBuffers) {
+      vertexArrays.storage.emplace_back(v);
+    }
+
+    for (auto &v : streams->indexBuffers) {
+      indexArrays.storage.emplace_back(v);
+    }
+
     for (auto &m : model->meshes) {
       for (auto &p : m.primitives) {
-        auto vtx = streams->vertexBuffers.items.Get() + p.bufferID;
-        Primitive prim(*vtx);
-        prim.main = &p;
-        prim.vertexBuffer = vtx;
-        prim.indexBuffer = streams->indexBuffers.items.Get() + p.meshFacesID;
-        primitives.storage.emplace_back(prim);
+        primitives.storage.emplace_back(p);
       }
     }
 
@@ -963,10 +1008,224 @@ public:
   uni::SkinsConst Skins() const override {
     return uni::Element<const uni::List<uni::Skin>>(&skins, false);
   }
+  uni::IndexArraysConst Indices() const override {
+    return uni::Element<const uni::List<uni::IndexArray>>(&indexArrays, false);
+  }
+  uni::VertexArraysConst Vertices() const override {
+    return uni::Element<const uni::List<uni::VertexArray>>(&vertexArrays,
+                                                           false);
+  }
   uni::ResourcesConst Resources() const override { return {}; }
   uni::MaterialsConst Materials() const override {
     return uni::Element<const uni::List<uni::Material>>(&materials, false);
   }
+
+  const Morphs *MorphTargets() const override { return nullptr; }
+};
+
+struct V3Bone : uni::Bone {
+  V3::Bone *bone;
+  size_t index;
+
+  uni::TransformType TMType() const override {
+    return uni::TransformType::TMTYPE_RTS;
+  }
+
+  /*void GetTM(uni::RTSValue &out) const override {
+    //memcpy(&out., &bone->transform, sizeof(bone->transform));
+  }*/
+
+  const Bone *Parent() const override { return nullptr; }
+  size_t Index() const override { return index; }
+  std::string Name() const override { return bone->name.Get(); }
+
+  operator uni::Element<const uni::Bone>() const {
+    return uni::Element<const uni::Bone>{this, false};
+  }
+};
+
+struct V3Skeleton : uni::Skeleton {
+  uni::VectorList<uni::Bone, V3Bone> bones;
+  V3Skeleton() = default;
+  V3Skeleton(V3::Skin *skin) {
+    bones.storage.resize(skin->count1);
+
+    for (size_t i = 0; i < skin->count1; i++) {
+      V3Bone bne;
+      bne.bone = skin->nodes.Get() + i;
+      bne.index = i;
+      bones.storage[i] = bne;
+    }
+  }
+
+  uni::SkeletonBonesConst Bones() const override {
+    return uni::Element<const uni::List<uni::Bone>>(&bones, false);
+  }
+  std::string Name() const override { return {}; }
+};
+
+class V3Skin : public uni::Skin {
+public:
+  V3::Skin *main;
+
+  size_t NumNodes() const override { return main->count1; }
+  uni::TransformType TMType() const override {
+    return uni::TransformType::TMTYPE_MATRIX;
+  }
+  void GetTM(es::Matrix44 &out, size_t index) const override {
+    memcpy(&out, main->nodeIBMs.Get() + index, sizeof(TransformMatrix));
+  }
+  size_t NodeIndex(size_t index) const override { return index; }
+
+  operator uni::Element<const uni::Skin>() const {
+    return uni::Element<const uni::Skin>{this, false};
+  }
+};
+
+class V3Primitive : public uni::Primitive {
+public:
+  V3::Primitive *main;
+
+  V3Primitive(V3::Primitive &prim) : main(&prim) {}
+  std::string Name() const override { return {}; }
+  size_t SkinIndex() const override { return 0; }
+  int64 LODIndex() const override { return main->LOD; }
+  size_t MaterialIndex() const override { return main->materialID; }
+  size_t VertexArrayIndex(size_t id) const override { return main->bufferID; }
+  size_t IndexArrayIndex() const override { return main->meshFacesID; }
+  IndexType_e IndexType() const override { return IndexType_e::Triangle; }
+  size_t NumVertexArrays() const override { return 1; }
+
+  operator uni::Element<const uni::Primitive>() const {
+    return uni::Element<const uni::Primitive>{this, false};
+  }
+};
+
+class V3Morph : public Morph {
+public:
+  uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
+  size_t numVertices = 0;
+  size_t targetBuffer = 0;
+  es::string_view name;
+
+  V3Morph() = default;
+  V3Morph(V3::MorphBuffer *buff, char *buffer)
+      : numVertices(buff->vertexBufferSize) {
+    PrimitiveDescriptor desc{};
+    desc.buffer = buffer + buff->vertexBufferOffset;
+    desc.stride = buff->stride;
+
+    desc.usage = uni::PrimitiveDescriptor::Usage_e::PositionDelta;
+    desc.type = {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
+    descs.storage.emplace_back(desc);
+
+    desc.usage = uni::PrimitiveDescriptor::Usage_e::VertexIndex;
+    desc.type = {uni::FormatType::UINT, uni::DataType::R32};
+    desc.offset = 28;
+    descs.storage.emplace_back(desc);
+
+    desc.usage = uni::PrimitiveDescriptor::Usage_e::Normal;
+    desc.unpackType = uni::PrimitiveDescriptor::UnpackDataType_e::Add;
+    desc.unpack = -0.5f;
+    desc.offset = 16;
+    desc.type = {uni::FormatType::UNORM, uni::DataType::R8G8B8A8};
+    descs.storage.emplace_back(desc);
+  }
+
+  es::string_view Name() const override { return name; }
+  size_t TargetVertexArrayIndex() const override { return targetBuffer; }
+  uni::PrimitiveDescriptorsConst Descriptors() const override {
+    return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
+                                                                   false);
+  }
+  size_t NumVertices() const override { return numVertices; }
+
+  operator uni::Element<const Morph>() const {
+    return uni::Element<const Morph>{this, false};
+  }
+};
+
+class V3Model : public Model {
+public:
+  uni::VectorList<uni::Primitive, V3Primitive> primitives;
+  uni::VectorList<uni::Skin, V3Skin> skins;
+  uni::VectorList<uni::VertexArray, VertexBuffer> vertexArrays;
+  uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
+  uni::VectorList<Morph, V3Morph> morphs;
+  std::string streamBuffer;
+  V3::Stream *stream = nullptr;
+
+  V3Model() = default;
+  V3Model(V3::Model *model, BinReaderRef rd) {
+    {
+      std::string dBuffer;
+      rd.ReadContainer(dBuffer, rd.GetSize());
+      DRSM::Header *dhdr = reinterpret_cast<DRSM::Header *>(dBuffer.data());
+      ProcessClass(*dhdr);
+      DRSM::Resources *resources = dhdr->resources;
+      auto &modelEntry = resources->streamEntries.items
+                             .Get()[resources->modelStreamEntryIndex];
+      streamBuffer = resources->streams.items.Get()[0].GetData().substr(
+          modelEntry.offset, modelEntry.size);
+    }
+
+    stream = reinterpret_cast<V3::Stream *>(streamBuffer.data());
+    ProcessClass(*stream, {});
+
+    for (auto &v : stream->vertexBuffers) {
+      vertexArrays.storage.emplace_back(v);
+    }
+
+    if (stream->morphs) {
+      for (auto &d : stream->morphs->descs) {
+        auto &v = vertexArrays.storage.at(d.vertexBufferTargetIndex);
+        auto bbegin = stream->morphs->buffers.begin() + d.morphBufferBeginIndex;
+        auto bbuffer = streamBuffer.data() + stream->bufferOffset;
+        v.AppendMorphBuffer(bbegin, bbuffer);
+
+        for (size_t index = 2; auto &m : d.morphIDs) {
+          V3Morph mph(bbegin + index, bbuffer);
+          mph.targetBuffer = d.vertexBufferTargetIndex;
+          mph.name = (model->morphs->controls.begin() + m)->name1.Get();
+          morphs.storage.emplace_back(std::move(mph));
+          index++;
+        }
+      }
+    }
+
+    for (auto &v : stream->indexBuffers) {
+      indexArrays.storage.emplace_back(v);
+    }
+
+    for (auto &m : model->meshes) {
+      for (auto &p : m.primitives) {
+        primitives.storage.emplace_back(p);
+      }
+    }
+
+    if (model->skin) {
+      V3Skin sk;
+      sk.main = model->skin;
+      skins.storage.emplace_back(sk);
+    }
+  }
+
+  uni::PrimitivesConst Primitives() const override {
+    return uni::Element<const uni::List<uni::Primitive>>(&primitives, false);
+  }
+  uni::IndexArraysConst Indices() const override {
+    return uni::Element<const uni::List<uni::IndexArray>>(&indexArrays, false);
+  }
+  uni::VertexArraysConst Vertices() const override {
+    return uni::Element<const uni::List<uni::VertexArray>>(&vertexArrays,
+                                                           false);
+  }
+  uni::SkinsConst Skins() const override {
+    return uni::Element<const uni::List<uni::Skin>>(&skins, false);
+  }
+  uni::ResourcesConst Resources() const override { return {}; }
+  uni::MaterialsConst Materials() const override { return {}; }
+  const Morphs *MorphTargets() const override { return &morphs; }
 };
 } // namespace
 
@@ -975,13 +1234,11 @@ namespace MXMD {
 class Impl {
 public:
   std::string buffer;
-  BinReaderRef stream;
-  Skeleton skel;
-  Model model;
+  std::variant<Skeleton, V3Skeleton> skel;
+  std::variant<V1Model, V3Model> model;
 
   void Load(BinReaderRef rd, BinReaderRef stream_,
             Wrap::ExcludeLoads excludeLoads) {
-    stream = stream_;
     rd.ReadContainer(buffer, rd.GetSize());
 
     HeaderBase &hdr = reinterpret_cast<HeaderBase &>(*buffer.data());
@@ -993,7 +1250,15 @@ public:
       V1::Header &main = static_cast<V1::Header &>(hdr);
       if (main.models) {
         skel = Skeleton(main.models->bones.items, main.models->bones.numItems);
-        model = Model(main);
+        model = V1Model(main);
+      }
+    } else if (hdr.version == Versions::MXMDVer3) {
+      V3::Header &main = static_cast<V3::Header &>(hdr);
+      if (main.models) {
+        model = V3Model(main.models, stream_);
+        if (main.models->skin) {
+          skel = V3Skeleton(main.models->skin);
+        }
       }
     }
   }
@@ -1022,8 +1287,13 @@ void Wrap::Load(BinReaderRef main, BinReaderRef stream,
   pi->Load(main, stream, excludeLoads);
 }
 
-Wrap::operator const uni::Skeleton *() { return &pi->skel; }
-Wrap::operator const uni::Model *() { return &pi->model; }
+Wrap::operator const uni::Skeleton *() {
+  return std::visit([](auto &item) -> uni::Skeleton * { return &item; },
+                    pi->skel);
+}
+Wrap::operator const Model *() {
+  return std::visit([](auto &item) -> Model * { return &item; }, pi->model);
+}
 
 class WrapFriend : public Wrap {
 public:
