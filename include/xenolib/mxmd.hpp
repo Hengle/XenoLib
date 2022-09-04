@@ -20,17 +20,19 @@
 #include "uni/model.hpp"
 #include "uni/skeleton.hpp"
 #include <memory>
+#include <span>
 
 namespace MXMD {
 class Impl;
 
 class Morph : public uni::VertexArray {
 public:
-  virtual es::string_view Name() const = 0;
+  virtual size_t Index() const = 0;
   virtual size_t TargetVertexArrayIndex() const = 0;
 };
 
 using Morphs = uni::List<Morph>;
+using MorphNames = std::span<const es::string_view>;
 
 class WeightSampler : public uni::Base {
 public:
@@ -47,6 +49,7 @@ public:
 class Model : public uni::Model {
 public:
   virtual const Morphs *MorphTargets() const = 0;
+  virtual const MorphNames MorphTargetNames() const = 0;
   virtual const WeightSamplers_t *WeightSamplers() const = 0;
 };
 

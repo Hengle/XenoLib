@@ -1023,6 +1023,7 @@ public:
 
   const Morphs *MorphTargets() const override { return nullptr; }
   const WeightSamplers_t *WeightSamplers() const override { return nullptr; }
+  const MorphNames MorphTargetNames() const override { return {}; }
 };
 
 struct V3Bone : uni::Bone {
@@ -1108,7 +1109,7 @@ public:
   uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
   size_t numVertices = 0;
   size_t targetBuffer = 0;
-  es::string_view name;
+  size_t index;
 
   V3Morph() = default;
   V3Morph(V3::MorphBuffer *buff, char *buffer)
@@ -1134,7 +1135,7 @@ public:
     descs.storage.emplace_back(desc);
   }
 
-  es::string_view Name() const override { return name; }
+  size_t Index() const override { return index; }
   size_t TargetVertexArrayIndex() const override { return targetBuffer; }
   uni::PrimitiveDescriptorsConst Descriptors() const override {
     return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
@@ -1255,6 +1256,7 @@ public:
   uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
   uni::VectorList<Morph, V3Morph> morphs;
   std::optional<V3WeightSamplers_t> weightSamplers;
+  std::vector<es::string_view> morphNames;
   std::string streamBuffer;
   V3::Stream *stream = nullptr;
 
@@ -1289,10 +1291,14 @@ public:
         for (size_t index = 2; auto &m : d.morphIDs) {
           V3Morph mph(bbegin + index, bbuffer);
           mph.targetBuffer = d.vertexBufferTargetIndex;
-          mph.name = (model->morphs->controls.begin() + m)->name1.Get();
+          mph.index = m;
           morphs.storage.emplace_back(std::move(mph));
           index++;
         }
+      }
+
+      for (auto &m : model->morphs->controls) {
+        morphNames.emplace_back(m.name1.Get());
       }
     }
 
@@ -1338,6 +1344,7 @@ public:
   const WeightSamplers_t *WeightSamplers() const override {
     return weightSamplers ? &weightSamplers.value() : nullptr;
   }
+  const MorphNames MorphTargetNames() const override { return morphNames; }
 };
 } // namespace
 
