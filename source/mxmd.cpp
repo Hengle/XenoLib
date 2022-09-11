@@ -116,9 +116,11 @@ struct VertexBuffer : uni::VertexArray {
   uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
   size_t numVertices = 0;
 
+  VertexBuffer() = default;
+
   VertexBuffer(V1::VertexBuffer &buff) : numVertices(buff.data.numItems) {
     descs.storage.reserve(buff.descriptors.numItems);
-    PrimitiveDescriptor desc;
+    PrimitiveDescriptor desc{};
     desc.buffer = buff.data.items;
     desc.stride = buff.stride;
     size_t curOffset = 0;
@@ -619,7 +621,6 @@ template <> void XN_EXTERN ProcessClass(V3::Skin &item, ProcessFlags flags) {
   es::FixupPointers(flags.base, item.nodes, item.nodeIBMs, item.nodeTMs0,
                     item.nodeTMs1);
   assert(item.count1 == item.count2);
-  assert(item.nodeTMs0.Get() == item.nodeTMs1.Get());
 
   V3::Bone *nodes = item.nodes;
 
@@ -916,7 +917,7 @@ public:
   size_t SkinIndex() const override { return 0; }
   int64 LODIndex() const override { return 0; }
   size_t MaterialIndex() const override { return main->materialID; }
-  size_t VertexArrayIndex(size_t id) const override { return main->bufferID; }
+  size_t VertexArrayIndex(size_t) const override { return main->bufferID; }
   size_t IndexArrayIndex() const override { return main->meshFacesID; }
   IndexType_e IndexType() const override { return IndexType_e::Triangle; }
   size_t NumVertexArrays() const override { return 1; }
@@ -1021,6 +1022,7 @@ public:
   }
 
   const Morphs *MorphTargets() const override { return nullptr; }
+  const WeightSamplers_t *WeightSamplers() const override { return nullptr; }
 };
 
 struct V3Bone : uni::Bone {
@@ -1145,6 +1147,106 @@ public:
   }
 };
 
+class V3WeightSampler : public WeightSampler {
+public:
+  uint32 bufferOffset = 0;
+  VertexBuffer *buffer = nullptr;
+
+  V3WeightSampler() = default;
+  V3WeightSampler(V3::WeightPalette &pal, VertexBuffer &buff)
+      : bufferOffset{pal.vertexIndexSubstract - pal.bufferVertexBegin},
+        buffer{&buff} {}
+
+  void Resample(const std::vector<uint32> &indices,
+                std::vector<uint32> &outBoneIds,
+                std::vector<uint32> &outBoneWeights) const override {
+    outBoneWeights.resize(indices.size());
+    outBoneIds.resize(indices.size());
+
+    for (auto &d : buffer->descs.storage) {
+      switch (d.Usage()) {
+      case PrimitiveDescriptor::Usage_e::BoneWeights: {
+        auto &codec = d.Codec();
+        for (size_t idx = 0; auto i : indices) {
+          size_t index = i + bufferOffset;
+          Vector4A16 v;
+          codec.GetValue(v, d.RawBuffer() + index * d.Stride());
+          v.w = std::max(1.f - v.x - v.y - v.z, 0.f);
+          v *= 0xff;
+          v = Vector4A16(_mm_round_ps(v._data, _MM_ROUND_NEAREST));
+          auto comp = v.Convert<uint8>();
+          outBoneWeights.at(idx++) = reinterpret_cast<uint32 &>(comp);
+        }
+
+        break;
+      }
+      case PrimitiveDescriptor::Usage_e::BoneIndices: {
+        auto &codec = d.Codec();
+        for (size_t idx = 0; auto i : indices) {
+          size_t index = i + bufferOffset;
+          IVector4A16 v;
+          codec.GetValue(v, d.RawBuffer() + index * d.Stride());
+          auto comp = v.Convert<uint8>();
+          outBoneIds.at(idx++) = reinterpret_cast<uint32 &>(comp);
+        }
+
+        break;
+      }
+      default:
+        throw std::runtime_error("Unhandled vertex weight type");
+      }
+    }
+  }
+
+  operator uni::Element<const WeightSampler>() const {
+    return uni::Element<const WeightSampler>{this, false};
+  }
+};
+
+class V3WeightSamplers_t : public WeightSamplers_t {
+public:
+  std::vector<std::array<V3WeightSampler, 16>> samplers;
+  V3::SkinManager *man;
+
+  V3WeightSamplers_t() = default;
+  V3WeightSamplers_t(V3::SkinManager *man_, VertexBuffer &buff) : man(man_) {
+    samplers.resize(man->numLODs);
+
+    for (auto &p : man->weightPalettes) {
+      std::construct_at(
+          &samplers.at(p.mergeTableIndex).at(p.indexWithinMergeTable), p, buff);
+    }
+  }
+
+  const WeightSampler *Get(const uni::Primitive *prim) const override {
+    auto v3Prim = static_cast<const V3Primitive *>(prim);
+    auto sFlags = v3Prim->main->skinFlags;
+    uint32 palIndex = 0;
+
+    while (sFlags && (sFlags & 1) == 0) {
+      palIndex++;
+      sFlags >>= 1;
+    }
+
+    auto lod = std::max(v3Prim->LODIndex() - 1, int64(0));
+    auto &lodSmpl = samplers.at(lod);
+
+    auto smplIndex = &lodSmpl.at(palIndex);
+    if (!smplIndex->buffer) {
+      for (auto &s : lodSmpl) {
+        if (s.buffer) {
+          smplIndex = &s;
+          break;
+        }
+      }
+    }
+
+    assert(smplIndex->buffer != nullptr);
+
+    return smplIndex;
+  }
+};
+
 class V3Model : public Model {
 public:
   uni::VectorList<uni::Primitive, V3Primitive> primitives;
@@ -1152,6 +1254,7 @@ public:
   uni::VectorList<uni::VertexArray, VertexBuffer> vertexArrays;
   uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
   uni::VectorList<Morph, V3Morph> morphs;
+  std::optional<V3WeightSamplers_t> weightSamplers;
   std::string streamBuffer;
   V3::Stream *stream = nullptr;
 
@@ -1207,6 +1310,12 @@ public:
       V3Skin sk;
       sk.main = model->skin;
       skins.storage.emplace_back(sk);
+
+      if (stream->skinManager) {
+        weightSamplers = V3WeightSamplers_t(
+            stream->skinManager,
+            vertexArrays.storage.at(stream->skinManager->weightBufferID));
+      }
     }
   }
 
@@ -1226,6 +1335,9 @@ public:
   uni::ResourcesConst Resources() const override { return {}; }
   uni::MaterialsConst Materials() const override { return {}; }
   const Morphs *MorphTargets() const override { return &morphs; }
+  const WeightSamplers_t *WeightSamplers() const override {
+    return weightSamplers ? &weightSamplers.value() : nullptr;
+  }
 };
 } // namespace
 

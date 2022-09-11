@@ -32,9 +32,22 @@ public:
 
 using Morphs = uni::List<Morph>;
 
+class WeightSampler : public uni::Base {
+public:
+  virtual void Resample(const std::vector<uint32> &indices,
+                        std::vector<uint32> &outBoneIds,
+                        std::vector<uint32> &outBoneWeights) const = 0;
+};
+
+class WeightSamplers_t : public uni::Base {
+public:
+  virtual const WeightSampler *Get(const uni::Primitive *prim) const = 0;
+};
+
 class Model : public uni::Model {
-  public:
+public:
   virtual const Morphs *MorphTargets() const = 0;
+  virtual const WeightSamplers_t *WeightSamplers() const = 0;
 };
 
 class XN_EXTERN Wrap {
