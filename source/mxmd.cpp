@@ -21,8 +21,7 @@
 #include "datas/except.hpp"
 #include "uni/list_vector.hpp"
 #include "xenolib/drsm.hpp"
-#include "xenolib/internal/mxmd.hpp"
-#include <cassert>
+#include "xenolib/internal/model.hpp"
 
 namespace MXMD {
 
@@ -34,6 +33,7 @@ VertexType::operator uni::FormatDescr() const {
     return {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
   case VertexDescriptorType::NORMAL:
   case VertexDescriptorType::TANGENT:
+  case VertexDescriptorType::TANGENT2:
   case VertexDescriptorType::NORMAL2:
     return {uni::FormatType::NORM, uni::DataType::R8G8B8A8};
   case VertexDescriptorType::TANGENT16:
@@ -44,10 +44,13 @@ VertexType::operator uni::FormatDescr() const {
   case VertexDescriptorType::WEIGHTID:
     return {uni::FormatType::UINT, uni::DataType::R16};
   case VertexDescriptorType::VERTEXCOLOR:
+  case VertexDescriptorType::VERTEXCOLOR2:
+  case VertexDescriptorType::VERTEXCOLOR3:
     return {uni::FormatType::UINT, uni::DataType::R8G8B8A8};
   case VertexDescriptorType::UV1:
   case VertexDescriptorType::UV2:
   case VertexDescriptorType::UV3:
+  case VertexDescriptorType::UV4:
     return {uni::FormatType::FLOAT, uni::DataType::R32G32};
   case VertexDescriptorType::WEIGHT16:
     return {uni::FormatType::UNORM, uni::DataType::R16G16B16A16};
@@ -74,122 +77,22 @@ VertexType::operator uni::PrimitiveDescriptor::Usage_e() const {
   case VertexDescriptorType::WEIGHTID:
     return ut::VertexIndex;
   case VertexDescriptorType::VERTEXCOLOR:
+  case VertexDescriptorType::VERTEXCOLOR2:
+  case VertexDescriptorType::VERTEXCOLOR3:
     return ut::VertexColor;
   case VertexDescriptorType::UV1:
   case VertexDescriptorType::UV2:
   case VertexDescriptorType::UV3:
+  case VertexDescriptorType::UV4:
     return ut::TextureCoordiante;
   case VertexDescriptorType::TANGENT:
+  case VertexDescriptorType::TANGENT2:
   case VertexDescriptorType::TANGENT16:
     return ut::Tangent;
   default:
     throw std::runtime_error("Unhandled vertex type");
   }
 }
-
-namespace {
-struct PrimitiveDescriptor : uni::PrimitiveDescriptor {
-  char *buffer;
-  size_t stride;
-  size_t offset;
-  size_t index;
-  uni::PrimitiveDescriptor::Usage_e usage;
-  uni::FormatDescr type;
-  float unpack = 0.f;
-  UnpackDataType_e unpackType = UnpackDataType_e::None;
-  const char *RawBuffer() const { return buffer + offset; }
-  size_t Stride() const { return stride; }
-  size_t Offset() const { return offset; }
-  size_t Index() const { return index; }
-  Usage_e Usage() const { return usage; }
-  uni::FormatDescr Type() const { return type; }
-  uni::BBOX UnpackData() const { return {{unpack}, {unpack}}; }
-  UnpackDataType_e UnpackDataType() const { return unpackType; }
-
-  operator uni::Element<const uni::PrimitiveDescriptor>() const {
-    return uni::Element<const uni::PrimitiveDescriptor>{this, false};
-  }
-};
-} // namespace
-
-struct VertexBuffer : uni::VertexArray {
-  uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
-  size_t numVertices = 0;
-
-  VertexBuffer() = default;
-
-  VertexBuffer(V1::VertexBuffer &buff) : numVertices(buff.data.numItems) {
-    descs.storage.reserve(buff.descriptors.numItems);
-    PrimitiveDescriptor desc{};
-    desc.buffer = buff.data.items;
-    desc.stride = buff.stride;
-    size_t curOffset = 0;
-
-    for (auto &d : buff.descriptors) {
-      desc.offset = curOffset;
-      curOffset += d.size;
-      desc.usage = d;
-      desc.type = d;
-      desc.index = [&] {
-        switch (d.type) {
-        case VertexDescriptorType::UV2:
-          return 1;
-        case VertexDescriptorType::UV3:
-          return 2;
-        default:
-          return 0;
-        }
-      }();
-
-      descs.storage.emplace_back(desc);
-    }
-  }
-
-  void AppendMorphBuffer(V3::MorphBuffer *buff, char *buffer) {
-    PrimitiveDescriptor desc{};
-    desc.buffer = buffer + buff->vertexBufferOffset;
-    desc.stride = buff->stride;
-
-    desc.usage = uni::PrimitiveDescriptor::Usage_e::Position;
-    desc.type = {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
-    descs.storage.emplace_back(desc);
-
-    desc.usage = uni::PrimitiveDescriptor::Usage_e::Normal;
-    desc.unpackType = uni::PrimitiveDescriptor::UnpackDataType_e::Add;
-    desc.unpack = -0.5f;
-    desc.offset = 12;
-    desc.type = {uni::FormatType::UNORM, uni::DataType::R8G8B8A8};
-    descs.storage.emplace_back(desc);
-  }
-
-  uni::PrimitiveDescriptorsConst Descriptors() const override {
-    return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
-                                                                   false);
-  }
-  size_t NumVertices() const override { return numVertices; }
-
-  operator uni::Element<const uni::VertexArray>() const {
-    return uni::Element<const uni::VertexArray>{this, false};
-  }
-};
-
-struct IndexBuffer : uni::IndexArray {
-  uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
-  V1::IndexBuffer *buffer;
-
-  IndexBuffer(V1::IndexBuffer &buff) : buffer(&buff) {}
-
-  const char *RawIndexBuffer() const override {
-    return reinterpret_cast<const char *>(buffer->indices.items.Get());
-  }
-
-  size_t IndexSize() const override { return 2; }
-  size_t NumIndices() const override { return buffer->indices.numItems; }
-
-  operator uni::Element<const uni::IndexArray>() const {
-    return uni::Element<const uni::IndexArray>{this, false};
-  }
-};
 } // namespace MXMD
 
 using namespace MXMD;
@@ -314,21 +217,23 @@ template <> void XN_EXTERN ProcessClass(V1::Model &item, ProcessFlags flags) {
   es::FixupPointers(flags.base, item.boneNames, item.bones, item.floats,
                     item.meshes, item.skins);
 
-  for (auto &b : item.boneNames) {
-    FByteswapper(b);
-    b.Fixup(flags.base);
+  if (item.boneNames.items) {
+    for (auto &b : item.boneNames) {
+      FByteswapper(b);
+      b.Fixup(flags.base);
+    }
+
+    auto boneNamesFlags = flags;
+    boneNamesFlags.base = reinterpret_cast<char *>(item.bones.begin());
+
+    for (auto &b : item.bones) {
+      ProcessClass(b, boneNamesFlags);
+    }
   }
 
-  auto boneNamesFlags = flags;
-  boneNamesFlags.base = reinterpret_cast<char *>(item.bones.begin());
-
-  for (auto &b : item.bones) {
-    ProcessClass(b, boneNamesFlags);
-  }
-
-  for (auto &f : item.floats) {
+  /*for (auto &f : item.floats) {
     FByteswapper(f);
-  }
+  }*/
 
   for (auto &m : item.meshes) {
     ProcessClass(m, flags);
@@ -381,7 +286,7 @@ void XN_EXTERN ProcessClass(V1::VertexBuffer &item, ProcessFlags flags) {
     FByteswapper(d);
   }
 
-  const size_t numVerts = item.data.numItems / item.stride;
+  const size_t numVerts = item.data.numItems;
   char *buffer = item.data.items.Get();
 
   for (auto &d : item.descriptors) {
@@ -403,6 +308,7 @@ void XN_EXTERN ProcessClass(V1::VertexBuffer &item, ProcessFlags flags) {
     case VertexDescriptorType::UV1:
     case VertexDescriptorType::UV2:
     case VertexDescriptorType::UV3:
+    case VertexDescriptorType::UV4:
       for (size_t i = 0; i < numVerts; i++) {
         char *bufBegin = buffer + item.stride * i;
         FByteswapper(*reinterpret_cast<Vector2 *>(bufBegin));
@@ -418,10 +324,12 @@ void XN_EXTERN ProcessClass(V1::VertexBuffer &item, ProcessFlags flags) {
     case VertexDescriptorType::NORMAL:
     case VertexDescriptorType::NORMAL2:
     case VertexDescriptorType::TANGENT:
+    case VertexDescriptorType::TANGENT2:
     case VertexDescriptorType::BONEID:
     case VertexDescriptorType::BONEID2:
     case VertexDescriptorType::VERTEXCOLOR:
-    // case VertexDescriptorType::NORMALMORPH:
+    case VertexDescriptorType::VERTEXCOLOR2:
+    case VertexDescriptorType::VERTEXCOLOR3:
     case VertexDescriptorType::REFLECTION:
       break;
     default:
@@ -440,6 +348,7 @@ void XN_EXTERN ProcessClass(V1::IndexBuffer &item, ProcessFlags flags) {
 
   FByteswapper(item);
   item.indices.Fixup(flags.base);
+  assert(item.null == 0);
 
   for (auto &i : item.indices) {
     FByteswapper(i);
@@ -860,501 +769,110 @@ V3::Header::SMTTextures V3::Header::GetSMT() {
   return reinterpret_cast<DRSM::Resources *>(uncachedTextures.Get());
 }
 
-namespace {
-struct Bone : uni::Bone {
-  V1::Bone *bone;
-  size_t index;
-  Bone *parent = nullptr;
+MDO::V1Model::V1Model(V1::Header &main) {
+  auto model = main.models.Get();
+  auto streams = main.streams.Get();
+  auto mats = main.materials.Get();
 
-  uni::TransformType TMType() const override {
-    return uni::TransformType::TMTYPE_MATRIX;
+  for (auto &v : streams->vertexBuffers) {
+    vertexArrays.storage.emplace_back(v);
   }
 
-  void GetTM(es::Matrix44 &out) const override {
-    memcpy(&out, &bone->transform, sizeof(bone->transform));
+  for (auto &v : streams->indexBuffers) {
+    indexArrays.storage.emplace_back(v);
   }
-  const Bone *Parent() const override { return parent; }
-  size_t Index() const override { return index; }
-  std::string Name() const override { return bone->name.Get(); }
 
-  operator uni::Element<const uni::Bone>() const {
-    return uni::Element<const uni::Bone>{this, false};
-  }
-};
-
-struct Skeleton : uni::Skeleton {
-  uni::VectorList<uni::Bone, Bone> bones;
-  Skeleton() = default;
-  Skeleton(V1::Bone *bone, size_t count) {
-    bones.storage.resize(count);
-
-    for (size_t i = 0; i < count; i++) {
-      Bone bne;
-      auto &nBone = bone[i];
-      bne.bone = bone + i;
-      bne.index = i;
-
-      if (nBone.parentID >= 0) {
-        bne.parent = &bones.storage[nBone.parentID];
-      }
-
-      bones.storage[i] = bne;
+  for (auto &m : model->meshes) {
+    for (auto &p : m.primitives) {
+      primitives.storage.emplace_back(p);
     }
   }
 
-  uni::SkeletonBonesConst Bones() const override {
-    return uni::Element<const uni::List<uni::Bone>>(&bones, false);
-  }
-  std::string Name() const override { return {}; }
-};
-
-class Primitive : public uni::Primitive {
-public:
-  V1::Primitive *main;
-
-  Primitive(V1::Primitive &prim) : main(&prim) {}
-  std::string Name() const override { return {}; }
-  size_t SkinIndex() const override { return 0; }
-  int64 LODIndex() const override { return 0; }
-  size_t MaterialIndex() const override { return main->materialID; }
-  size_t VertexArrayIndex(size_t) const override { return main->bufferID; }
-  size_t IndexArrayIndex() const override { return main->meshFacesID; }
-  IndexType_e IndexType() const override { return IndexType_e::Triangle; }
-  size_t NumVertexArrays() const override { return 1; }
-
-  operator uni::Element<const uni::Primitive>() const {
-    return uni::Element<const uni::Primitive>{this, false};
-  }
-};
-
-class Skin : public uni::Skin {
-public:
-  V1::MeshSkin *main;
-  V1::Bone *bones;
-
-  size_t NumNodes() const override { return main->boneIndices.numItems; }
-  uni::TransformType TMType() const override {
-    return uni::TransformType::TMTYPE_MATRIX;
-  }
-  void GetTM(es::Matrix44 &out, size_t index) const override {
-    memcpy(&out, &bones[NodeIndex(index)].ibm, sizeof(V1::Bone::ibm));
-  }
-  size_t NodeIndex(size_t index) const override {
-    return main->boneIndices.items[index];
+  for (auto &s : model->skins) {
+    Skin sk;
+    sk.main = &s;
+    sk.bones = model->bones.items.Get();
+    skins.storage.emplace_back(sk);
   }
 
-  operator uni::Element<const uni::Skin>() const {
-    return uni::Element<const uni::Skin>{this, false};
+  for (auto &m : mats->materials) {
+    Material mat;
+    mat.main = &m;
+    materials.storage.emplace_back(mat);
   }
-};
+}
 
-class Material : public uni::Material {
-public:
-  V1::Material *main;
-
-  size_t Version() const override { return 1; }
-  std::string Name() const override { return main->name.Get(); }
-  std::string TypeName() const override { return {}; }
-
-  operator uni::Element<const uni::Material>() const {
-    return uni::Element<const uni::Material>{this, false};
+MDO::V3Model::V3Model(V3::Model *model, BinReaderRef rd) {
+  {
+    std::string dBuffer;
+    rd.ReadContainer(dBuffer, rd.GetSize());
+    DRSM::Header *dhdr = reinterpret_cast<DRSM::Header *>(dBuffer.data());
+    ProcessClass(*dhdr);
+    DRSM::Resources *resources = dhdr->resources;
+    auto &modelEntry =
+        resources->streamEntries.items.Get()[resources->modelStreamEntryIndex];
+    streamBuffer = resources->streams.items.Get()[0].GetData().substr(
+        modelEntry.offset, modelEntry.size);
   }
-};
 
-class V1Model : public Model {
-public:
-  uni::VectorList<uni::Primitive, Primitive> primitives;
-  uni::VectorList<uni::Skin, Skin> skins;
-  uni::VectorList<uni::Material, Material> materials;
-  uni::VectorList<uni::VertexArray, VertexBuffer> vertexArrays;
-  uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
+  stream = reinterpret_cast<V3::Stream *>(streamBuffer.data());
+  ProcessClass(*stream, {});
 
-  V1Model() = default;
-  V1Model(V1::Header &main) {
-    auto model = main.models.Get();
-    auto streams = main.streams.Get();
-    auto mats = main.materials.Get();
+  for (auto &v : stream->vertexBuffers) {
+    vertexArrays.storage.emplace_back(v);
+  }
 
-    for (auto &v : streams->vertexBuffers) {
-      vertexArrays.storage.emplace_back(v);
-    }
+  if (stream->morphs) {
+    for (auto &d : stream->morphs->descs) {
+      auto &v = vertexArrays.storage.at(d.vertexBufferTargetIndex);
+      auto bbegin = stream->morphs->buffers.begin() + d.morphBufferBeginIndex;
+      auto bbuffer = streamBuffer.data() + stream->bufferOffset;
+      v.AppendMorphBuffer(bbegin, bbuffer);
 
-    for (auto &v : streams->indexBuffers) {
-      indexArrays.storage.emplace_back(v);
-    }
-
-    for (auto &m : model->meshes) {
-      for (auto &p : m.primitives) {
-        primitives.storage.emplace_back(p);
+      for (size_t index = 2; auto &m : d.morphIDs) {
+        V3Morph mph(bbegin + index, bbuffer);
+        mph.targetBuffer = d.vertexBufferTargetIndex;
+        mph.index = m;
+        morphs.storage.emplace_back(std::move(mph));
+        index++;
       }
     }
 
-    for (auto &s : model->skins) {
-      Skin sk;
-      sk.main = &s;
-      sk.bones = model->bones.items.Get();
-      skins.storage.emplace_back(sk);
-    }
-
-    for (auto &m : mats->materials) {
-      Material mat;
-      mat.main = &m;
-      materials.storage.emplace_back(mat);
+    for (auto &m : model->morphs->controls) {
+      morphNames.emplace_back(m.name1.Get());
     }
   }
 
-  uni::PrimitivesConst Primitives() const override {
-    return uni::Element<const uni::List<uni::Primitive>>(&primitives, false);
-  }
-  uni::SkinsConst Skins() const override {
-    return uni::Element<const uni::List<uni::Skin>>(&skins, false);
-  }
-  uni::IndexArraysConst Indices() const override {
-    return uni::Element<const uni::List<uni::IndexArray>>(&indexArrays, false);
-  }
-  uni::VertexArraysConst Vertices() const override {
-    return uni::Element<const uni::List<uni::VertexArray>>(&vertexArrays,
-                                                           false);
-  }
-  uni::ResourcesConst Resources() const override { return {}; }
-  uni::MaterialsConst Materials() const override {
-    return uni::Element<const uni::List<uni::Material>>(&materials, false);
+  for (auto &v : stream->indexBuffers) {
+    indexArrays.storage.emplace_back(v);
   }
 
-  const Morphs *MorphTargets() const override { return nullptr; }
-  const WeightSamplers_t *WeightSamplers() const override { return nullptr; }
-  const MorphNames MorphTargetNames() const override { return {}; }
-};
-
-struct V3Bone : uni::Bone {
-  V3::Bone *bone;
-  size_t index;
-
-  uni::TransformType TMType() const override {
-    return uni::TransformType::TMTYPE_RTS;
-  }
-
-  /*void GetTM(uni::RTSValue &out) const override {
-    //memcpy(&out., &bone->transform, sizeof(bone->transform));
-  }*/
-
-  const Bone *Parent() const override { return nullptr; }
-  size_t Index() const override { return index; }
-  std::string Name() const override { return bone->name.Get(); }
-
-  operator uni::Element<const uni::Bone>() const {
-    return uni::Element<const uni::Bone>{this, false};
-  }
-};
-
-struct V3Skeleton : uni::Skeleton {
-  uni::VectorList<uni::Bone, V3Bone> bones;
-  V3Skeleton() = default;
-  V3Skeleton(V3::Skin *skin) {
-    bones.storage.resize(skin->count1);
-
-    for (size_t i = 0; i < skin->count1; i++) {
-      V3Bone bne;
-      bne.bone = skin->nodes.Get() + i;
-      bne.index = i;
-      bones.storage[i] = bne;
+  for (auto &m : model->meshes) {
+    for (auto &p : m.primitives) {
+      primitives.storage.emplace_back(p);
     }
   }
 
-  uni::SkeletonBonesConst Bones() const override {
-    return uni::Element<const uni::List<uni::Bone>>(&bones, false);
-  }
-  std::string Name() const override { return {}; }
-};
+  if (model->skin) {
+    V3Skin sk;
+    sk.main = model->skin;
+    skins.storage.emplace_back(sk);
 
-class V3Skin : public uni::Skin {
-public:
-  V3::Skin *main;
-
-  size_t NumNodes() const override { return main->count1; }
-  uni::TransformType TMType() const override {
-    return uni::TransformType::TMTYPE_MATRIX;
-  }
-  void GetTM(es::Matrix44 &out, size_t index) const override {
-    memcpy(&out, main->nodeIBMs.Get() + index, sizeof(TransformMatrix));
-  }
-  size_t NodeIndex(size_t index) const override { return index; }
-
-  operator uni::Element<const uni::Skin>() const {
-    return uni::Element<const uni::Skin>{this, false};
-  }
-};
-
-class V3Primitive : public uni::Primitive {
-public:
-  V3::Primitive *main;
-
-  V3Primitive(V3::Primitive &prim) : main(&prim) {}
-  std::string Name() const override { return {}; }
-  size_t SkinIndex() const override { return 0; }
-  int64 LODIndex() const override { return main->LOD; }
-  size_t MaterialIndex() const override { return main->materialID; }
-  size_t VertexArrayIndex(size_t id) const override { return main->bufferID; }
-  size_t IndexArrayIndex() const override { return main->meshFacesID; }
-  IndexType_e IndexType() const override { return IndexType_e::Triangle; }
-  size_t NumVertexArrays() const override { return 1; }
-
-  operator uni::Element<const uni::Primitive>() const {
-    return uni::Element<const uni::Primitive>{this, false};
-  }
-};
-
-class V3Morph : public Morph {
-public:
-  uni::VectorList<uni::PrimitiveDescriptor, PrimitiveDescriptor> descs;
-  size_t numVertices = 0;
-  size_t targetBuffer = 0;
-  size_t index;
-
-  V3Morph() = default;
-  V3Morph(V3::MorphBuffer *buff, char *buffer)
-      : numVertices(buff->vertexBufferSize) {
-    PrimitiveDescriptor desc{};
-    desc.buffer = buffer + buff->vertexBufferOffset;
-    desc.stride = buff->stride;
-
-    desc.usage = uni::PrimitiveDescriptor::Usage_e::PositionDelta;
-    desc.type = {uni::FormatType::FLOAT, uni::DataType::R32G32B32};
-    descs.storage.emplace_back(desc);
-
-    desc.usage = uni::PrimitiveDescriptor::Usage_e::VertexIndex;
-    desc.type = {uni::FormatType::UINT, uni::DataType::R32};
-    desc.offset = 28;
-    descs.storage.emplace_back(desc);
-
-    desc.usage = uni::PrimitiveDescriptor::Usage_e::Normal;
-    desc.unpackType = uni::PrimitiveDescriptor::UnpackDataType_e::Add;
-    desc.unpack = -0.5f;
-    desc.offset = 16;
-    desc.type = {uni::FormatType::UNORM, uni::DataType::R8G8B8A8};
-    descs.storage.emplace_back(desc);
-  }
-
-  size_t Index() const override { return index; }
-  size_t TargetVertexArrayIndex() const override { return targetBuffer; }
-  uni::PrimitiveDescriptorsConst Descriptors() const override {
-    return uni::Element<const uni::List<uni::PrimitiveDescriptor>>(&descs,
-                                                                   false);
-  }
-  size_t NumVertices() const override { return numVertices; }
-
-  operator uni::Element<const Morph>() const {
-    return uni::Element<const Morph>{this, false};
-  }
-};
-
-class V3WeightSampler : public WeightSampler {
-public:
-  uint32 bufferOffset = 0;
-  VertexBuffer *buffer = nullptr;
-
-  V3WeightSampler() = default;
-  V3WeightSampler(V3::WeightPalette &pal, VertexBuffer &buff)
-      : bufferOffset{pal.vertexIndexSubstract - pal.bufferVertexBegin},
-        buffer{&buff} {}
-
-  void Resample(const std::vector<uint32> &indices,
-                std::vector<uint32> &outBoneIds,
-                std::vector<uint32> &outBoneWeights) const override {
-    outBoneWeights.resize(indices.size());
-    outBoneIds.resize(indices.size());
-
-    for (auto &d : buffer->descs.storage) {
-      switch (d.Usage()) {
-      case PrimitiveDescriptor::Usage_e::BoneWeights: {
-        auto &codec = d.Codec();
-        for (size_t idx = 0; auto i : indices) {
-          size_t index = i + bufferOffset;
-          Vector4A16 v;
-          codec.GetValue(v, d.RawBuffer() + index * d.Stride());
-          v.w = std::max(1.f - v.x - v.y - v.z, 0.f);
-          v *= 0xff;
-          v = Vector4A16(_mm_round_ps(v._data, _MM_ROUND_NEAREST));
-          auto comp = v.Convert<uint8>();
-          outBoneWeights.at(idx++) = reinterpret_cast<uint32 &>(comp);
-        }
-
-        break;
-      }
-      case PrimitiveDescriptor::Usage_e::BoneIndices: {
-        auto &codec = d.Codec();
-        for (size_t idx = 0; auto i : indices) {
-          size_t index = i + bufferOffset;
-          IVector4A16 v;
-          codec.GetValue(v, d.RawBuffer() + index * d.Stride());
-          auto comp = v.Convert<uint8>();
-          outBoneIds.at(idx++) = reinterpret_cast<uint32 &>(comp);
-        }
-
-        break;
-      }
-      default:
-        throw std::runtime_error("Unhandled vertex weight type");
-      }
+    if (stream->skinManager) {
+      weightSamplers = V3WeightSamplers_t(
+          stream->skinManager,
+          vertexArrays.storage.at(stream->skinManager->weightBufferID));
     }
   }
-
-  operator uni::Element<const WeightSampler>() const {
-    return uni::Element<const WeightSampler>{this, false};
-  }
-};
-
-class V3WeightSamplers_t : public WeightSamplers_t {
-public:
-  std::vector<std::array<V3WeightSampler, 16>> samplers;
-  V3::SkinManager *man;
-
-  V3WeightSamplers_t() = default;
-  V3WeightSamplers_t(V3::SkinManager *man_, VertexBuffer &buff) : man(man_) {
-    samplers.resize(man->numLODs);
-
-    for (auto &p : man->weightPalettes) {
-      std::construct_at(
-          &samplers.at(p.mergeTableIndex).at(p.indexWithinMergeTable), p, buff);
-    }
-  }
-
-  const WeightSampler *Get(const uni::Primitive *prim) const override {
-    auto v3Prim = static_cast<const V3Primitive *>(prim);
-    auto sFlags = v3Prim->main->skinFlags;
-    uint32 palIndex = 0;
-
-    while (sFlags && (sFlags & 1) == 0) {
-      palIndex++;
-      sFlags >>= 1;
-    }
-
-    auto lod = std::max(v3Prim->LODIndex() - 1, int64(0));
-    auto &lodSmpl = samplers.at(lod);
-
-    auto smplIndex = &lodSmpl.at(palIndex);
-    if (!smplIndex->buffer) {
-      for (auto &s : lodSmpl) {
-        if (s.buffer) {
-          smplIndex = &s;
-          break;
-        }
-      }
-    }
-
-    assert(smplIndex->buffer != nullptr);
-
-    return smplIndex;
-  }
-};
-
-class V3Model : public Model {
-public:
-  uni::VectorList<uni::Primitive, V3Primitive> primitives;
-  uni::VectorList<uni::Skin, V3Skin> skins;
-  uni::VectorList<uni::VertexArray, VertexBuffer> vertexArrays;
-  uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
-  uni::VectorList<Morph, V3Morph> morphs;
-  std::optional<V3WeightSamplers_t> weightSamplers;
-  std::vector<es::string_view> morphNames;
-  std::string streamBuffer;
-  V3::Stream *stream = nullptr;
-
-  V3Model() = default;
-  V3Model(V3::Model *model, BinReaderRef rd) {
-    {
-      std::string dBuffer;
-      rd.ReadContainer(dBuffer, rd.GetSize());
-      DRSM::Header *dhdr = reinterpret_cast<DRSM::Header *>(dBuffer.data());
-      ProcessClass(*dhdr);
-      DRSM::Resources *resources = dhdr->resources;
-      auto &modelEntry = resources->streamEntries.items
-                             .Get()[resources->modelStreamEntryIndex];
-      streamBuffer = resources->streams.items.Get()[0].GetData().substr(
-          modelEntry.offset, modelEntry.size);
-    }
-
-    stream = reinterpret_cast<V3::Stream *>(streamBuffer.data());
-    ProcessClass(*stream, {});
-
-    for (auto &v : stream->vertexBuffers) {
-      vertexArrays.storage.emplace_back(v);
-    }
-
-    if (stream->morphs) {
-      for (auto &d : stream->morphs->descs) {
-        auto &v = vertexArrays.storage.at(d.vertexBufferTargetIndex);
-        auto bbegin = stream->morphs->buffers.begin() + d.morphBufferBeginIndex;
-        auto bbuffer = streamBuffer.data() + stream->bufferOffset;
-        v.AppendMorphBuffer(bbegin, bbuffer);
-
-        for (size_t index = 2; auto &m : d.morphIDs) {
-          V3Morph mph(bbegin + index, bbuffer);
-          mph.targetBuffer = d.vertexBufferTargetIndex;
-          mph.index = m;
-          morphs.storage.emplace_back(std::move(mph));
-          index++;
-        }
-      }
-
-      for (auto &m : model->morphs->controls) {
-        morphNames.emplace_back(m.name1.Get());
-      }
-    }
-
-    for (auto &v : stream->indexBuffers) {
-      indexArrays.storage.emplace_back(v);
-    }
-
-    for (auto &m : model->meshes) {
-      for (auto &p : m.primitives) {
-        primitives.storage.emplace_back(p);
-      }
-    }
-
-    if (model->skin) {
-      V3Skin sk;
-      sk.main = model->skin;
-      skins.storage.emplace_back(sk);
-
-      if (stream->skinManager) {
-        weightSamplers = V3WeightSamplers_t(
-            stream->skinManager,
-            vertexArrays.storage.at(stream->skinManager->weightBufferID));
-      }
-    }
-  }
-
-  uni::PrimitivesConst Primitives() const override {
-    return uni::Element<const uni::List<uni::Primitive>>(&primitives, false);
-  }
-  uni::IndexArraysConst Indices() const override {
-    return uni::Element<const uni::List<uni::IndexArray>>(&indexArrays, false);
-  }
-  uni::VertexArraysConst Vertices() const override {
-    return uni::Element<const uni::List<uni::VertexArray>>(&vertexArrays,
-                                                           false);
-  }
-  uni::SkinsConst Skins() const override {
-    return uni::Element<const uni::List<uni::Skin>>(&skins, false);
-  }
-  uni::ResourcesConst Resources() const override { return {}; }
-  uni::MaterialsConst Materials() const override { return {}; }
-  const Morphs *MorphTargets() const override { return &morphs; }
-  const WeightSamplers_t *WeightSamplers() const override {
-    return weightSamplers ? &weightSamplers.value() : nullptr;
-  }
-  const MorphNames MorphTargetNames() const override { return morphNames; }
-};
-} // namespace
+}
 
 namespace MXMD {
 
 class Impl {
 public:
   std::string buffer;
-  std::variant<Skeleton, V3Skeleton> skel;
-  std::variant<V1Model, V3Model> model;
+  std::variant<MDO::Skeleton, MDO::V3Skeleton> skel;
+  std::variant<MDO::V1Model, MDO::V3Model> model;
 
   void Load(BinReaderRef rd, BinReaderRef stream_,
             Wrap::ExcludeLoads excludeLoads) {
@@ -1368,15 +886,16 @@ public:
     if (hdr.version == Versions::MXMDVer1) {
       V1::Header &main = static_cast<V1::Header &>(hdr);
       if (main.models) {
-        skel = Skeleton(main.models->bones.items, main.models->bones.numItems);
-        model = V1Model(main);
+        skel = MDO::Skeleton(main.models->bones.items,
+                             main.models->bones.numItems);
+        model = MDO::V1Model(main);
       }
     } else if (hdr.version == Versions::MXMDVer3) {
       V3::Header &main = static_cast<V3::Header &>(hdr);
       if (main.models) {
-        model = V3Model(main.models, stream_);
+        model = MDO::V3Model(main.models, stream_);
         if (main.models->skin) {
-          skel = V3Skeleton(main.models->skin);
+          skel = MDO::V3Skeleton(main.models->skin);
         }
       }
     }

@@ -15,6 +15,7 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
+#pragma once
 #include "core.hpp"
 #include "datas/bincore_fwd.hpp"
 #include "uni/model.hpp"

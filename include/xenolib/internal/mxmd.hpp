@@ -76,16 +76,20 @@ enum class VertexDescriptorType : uint16 {
   WEIGHT32,
   BONEID,
   WEIGHTID,
-  UV1 = 5,
+  VERTEXCOLOR2,
+  UV1,
   UV2,
   UV3,
-  NORMAL32 = 15,
-  TANGENT16, // NoFunc
+  UV4,
+  VERTEXCOLOR3 = 14,
+  NORMAL32,
+  TANGENT16,
   VERTEXCOLOR,
   NORMAL = 28,
-  TANGENT, // NoFunc
-  NORMAL2 = 32,
-  REFLECTION, // NoFunc
+  TANGENT,
+  TANGENT2 = 31,
+  NORMAL2,
+  REFLECTION,
   WEIGHT16 = 41,
   BONEID2,
 };
@@ -94,8 +98,8 @@ struct VertexType {
   VertexDescriptorType type;
   uint16 size;
 
-  operator uni::FormatDescr() const;
-  operator uni::PrimitiveDescriptor::Usage_e() const;
+  XN_EXTERN operator uni::FormatDescr() const;
+  XN_EXTERN operator uni::PrimitiveDescriptor::Usage_e() const;
 };
 
 static constexpr int ID_BIG = CompileFourCC("MXMD");
