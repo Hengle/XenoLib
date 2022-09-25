@@ -40,7 +40,8 @@ public:
 
   size_t ModelIndex(size_t id) const;
 
-  void Load(BinReaderRef main, ExcludeLoads excludeLoads = {});
+  void LoadV1(BinReaderRef main, ExcludeLoads excludeLoads = {});
+  void LoadV2(BinReaderRef main, ExcludeLoads excludeLoads = {});
 
 private:
   friend class WrapFriend;

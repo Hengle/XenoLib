@@ -61,31 +61,6 @@ struct LocalCache {
   }
 };
 
-template <class C> void SendDDS(const C *hdr, AppExtractContext *ctx) {
-  DDS ddtex = ToDDS(hdr);
-
-  ctx->SendData({reinterpret_cast<const char *>(&ddtex), ddtex.DDS_SIZE});
-};
-
-void SendTexelsLB(es::string_view texData, AppExtractContext *ctx) {
-  std::string mipOut;
-  mipOut.resize(texData.size());
-  auto tex = LBIM::Mount(texData);
-  SendDDS(tex, ctx);
-  LBIM::DecodeMipmap(*tex, texData.data(), mipOut.data());
-  ctx->SendData(mipOut);
-}
-
-void SendTexelsGTX(es::string_view texData, AppExtractContext *ctx) {
-  std::string mipOut;
-  mipOut.resize(texData.size());
-  auto tex = MTXT::Mount(texData);
-  FByteswapper(*const_cast<MTXT::Header *>(tex));
-  SendDDS(tex, ctx);
-  MTXT::DecodeMipmap(*tex, texData.data(), mipOut.data());
-  ctx->SendData(mipOut);
-}
-
 void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
   {
     DRSM::Header hdr;

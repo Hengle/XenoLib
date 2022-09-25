@@ -15,12 +15,14 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
+#include "datas/aabb.hpp"
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/binwritter.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
 #include "datas/fileinfo.hpp"
+#include "datas/master_printer.hpp"
 #include "datas/matrix44.hpp"
 #include "datas/reflector.hpp"
 #include "gltf.hpp"
@@ -56,23 +58,6 @@ static AppInfo_s appInfo{
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
-
-struct AABBResult {
-  Vector4A16 max;
-  Vector4A16 min;
-  Vector4A16 center;
-};
-
-AABBResult GetAABB(const std::vector<Vector4A16> &points) {
-  Vector4A16 max(-INFINITY), min(INFINITY), center;
-  for (auto &p : points) {
-    max = Vector4A16(_mm_max_ps(max._data, p._data));
-    min = Vector4A16(_mm_min_ps(min._data, p._data));
-  }
-  center = (max + min) * 0.5f;
-
-  return {max, min, center};
-}
 
 struct MainGLTF : GLTF {
   void LoadSkeleton(AppContext *ctx) {
@@ -127,7 +112,8 @@ struct MainGLTF : GLTF {
     }
 
     if (!skelData) {
-      throw std::runtime_error("Cannot find skeleton data");
+      printerror("Cannot find skeleton data");
+      return;
     }
 
     BC::Header *hdr = reinterpret_cast<BC::Header *>(skelData);

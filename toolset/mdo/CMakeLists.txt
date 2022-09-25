@@ -7,6 +7,8 @@ build_target(
   ESMODULE
   SOURCES
   mdo_to_gltf.cpp
+  INCLUDES
+  ../common
   LINKS
   xeno
   gltf

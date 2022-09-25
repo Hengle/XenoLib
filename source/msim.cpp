@@ -124,6 +124,10 @@ struct VarModel {
   std::variant<V1Model, MDO::V3Model> model;
   size_t streamIndex;
 
+  VarModel() = default;
+  VarModel(VarModel &&) = default;
+  VarModel(auto &&any, size_t si) : model{any}, streamIndex(si) {}
+
   operator uni::Element<const uni::Model>() const {
     return uni::Element<const uni::Model>(
         std::visit([](auto &item) -> const uni::Model * { return &item; },
@@ -138,7 +142,7 @@ public:
   std::vector<std::string> streams;
   uni::VectorList<const uni::Model, VarModel> models;
 
-  void Load(BinReaderRef rd, Wrap::ExcludeLoads excludeLoads) {
+  void LoadV1(BinReaderRef rd, Wrap::ExcludeLoads excludeLoads) {
     rd.ReadContainer(buffer, rd.GetSize());
 
     ProcessFlags flags{ProcessFlag::EnsureBigEndian};
@@ -205,14 +209,22 @@ public:
       }
     }
   }
+
+  void LoadV2(BinReaderRef rd, Wrap::ExcludeLoads excludeLoads) {
+    throw std::logic_error("Mothod not implemented");
+  }
 };
 
 Wrap::Wrap() : pi(std::make_unique<Impl>()) {}
 Wrap::Wrap(Wrap &&) = default;
 Wrap::~Wrap() = default;
 
-void Wrap::Load(BinReaderRef main, ExcludeLoads excludeLoads) {
-  pi->Load(main, excludeLoads);
+void Wrap::LoadV1(BinReaderRef main, ExcludeLoads excludeLoads) {
+  pi->LoadV1(main, excludeLoads);
+}
+
+void Wrap::LoadV2(BinReaderRef main, ExcludeLoads excludeLoads) {
+  pi->LoadV2(main, excludeLoads);
 }
 
 Wrap::operator const uni::List<const uni::Model> *() { return &pi->models; }
