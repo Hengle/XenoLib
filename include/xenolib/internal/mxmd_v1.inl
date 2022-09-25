@@ -154,9 +154,9 @@ struct Shaders {
 };
 
 struct ExternalTexture {
-  uint16 textureID;
-  uint16 containerID;
-  uint16 externalTextureID;
+  uint16 mTextureIndex;
+  uint16 mContainerIndex;
+  uint16 hTextureIndex;
   uint16 unk;
 };
 
