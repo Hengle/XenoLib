@@ -12,3 +12,9 @@ Head to this **[Wiki](https://github.com/PredatorCZ/PreCore/wiki/Spike)** for mo
 <make_sar>Create SAR archives from files.</make_sar>
 <extract_shaders name="SHDExtract">Extract shaders from models, shader bundles or shaders. Converts them into GLSL code and/or shader assembly.</extract_shaders>
 <bdat_to_json>Converts BDAT data file or BDAT collection to JSON.</bdat_to_json>
+<asm_to_json name="ASM2JSON">Converts Animation State Machine graph to JSON.</asm_to_json>
+<extract_arh name="ARHExtract">Extract files from ARH/ARD archive pair.</extract_arh>
+<sm_extract name="SMExtract">Extract contents of streamed maps.</sm_extract>
+<im_to_gltf name="IM2GLTF">Convert streamed map instanced meshes to GLTF.</im_to_gltf>
+<tm_to_gltf name="TM2GLTF">Convert streamed map terrain model to GLTF.</tm_to_gltf>
+<mdo_to_gltf>Convert models to GLTF.</mdo_to_gltf>

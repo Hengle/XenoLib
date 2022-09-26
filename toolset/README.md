@@ -6,6 +6,12 @@ This toolset runs on Spike foundation.
 
 Head to this **[Wiki](https://github.com/PredatorCZ/PreCore/wiki/Spike)** for more information on how to effectively use it.
 
+## ASM2JSON
+
+### Module command: asm_to_json
+
+Converts Animation State Machine graph to JSON.
+
 ## BDAT2JSON
 
 ### Module command: bdat_to_json
@@ -23,11 +29,23 @@ Converts BDAT data file or BDAT collection to JSON.
 
   Extract by data entry if possible.
 
+## ARHExtract
+
+### Module command: extract_arh
+
+Extract files from ARH/ARD archive pair.
+
 ## SHDExtract
 
 ### Module command: extract_shaders
 
 Extract shaders from models, shader bundles or shaders. Converts them into GLSL code and/or shader assembly.
+
+## IM2GLTF
+
+### Module command: im_to_gltf
+
+Convert streamed map instanced meshes to GLTF.
 
 ## SARCreate
 
@@ -55,11 +73,32 @@ Create SAR archives from files.
 
   Output platform is big endian.
 
+## MDO2GLTF
+
+### Module command: mdo_to_gltf
+
+Convert models to GLTF.
+
+### Settings
+
+- **fallback-skeleton**
+
+  **CLI Long:** ***--fallback-skeleton***\
+  **CLI Short:** ***-f***
+
+  Fallback skeleton file name if none wasn't found.
+
 ## SARExtract
 
 ### Module command: sar_extract
 
 Exctract files from SAR archives.
+
+## SMExtract
+
+### Module command: sm_extract
+
+Extract contents of streamed maps.
 
 ## SMTExtract
 
@@ -73,3 +112,8 @@ Extract and convert textures from stream files into DDS.
 
 Convert textures or streamed textures into DDS format.
 
+## TM2GLTF
+
+### Module command: tm_to_gltf
+
+Convert streamed map terrain model to GLTF.
