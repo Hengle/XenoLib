@@ -17,11 +17,13 @@ Toolset can be found in [Toolset folder](https://github.com/PredatorCZ/XenoLib/t
 * MXMD models (camdo, wimdo)
 * DRSM/MXMD streams (casmt, wismt)
 * MTXT/LBIM textures (witex, catex)
-* XBC1 desompressor
+* XBC1 decompressor
 * SAR archives
 * BDAT data files
 * MTHS shaders
-* BC (SKEL, ANIM)
+* BC (SKEL, ANIM, ASM)
+* ARH/ARD archives
+* MSMD streamed maps (casm, wism)
 
 ## License
 
