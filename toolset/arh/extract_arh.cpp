@@ -18,31 +18,27 @@
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "project.h"
 #include "xenolib/arh.hpp"
 #include "xenolib/xbc1.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".arh$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::FILTERED,
-    ARHExtract_DESC " v" ARHExtract_VERSION ", " ARHExtract_COPYRIGHT
-                    "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .multithreaded = false,
+    .header = ARHExtract_DESC " v" ARHExtract_VERSION ", " ARHExtract_COPYRIGHT
+                              "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
+void AppProcessFile(AppContext *ctx) {
+  BinReaderRef rd(ctx->GetStream());
   ARH::Header hdr;
   rd.Read(hdr);
 
@@ -50,9 +46,8 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
     throw es::InvalidHeaderError(hdr.id);
   }
 
-  AFileInfo outPath(ctx->ctx->workingFile);
-  auto dataStream =
-      ctx->ctx->RequestFile(outPath.GetFullPathNoExt().to_string() + ".ard");
+  auto dataStream = ctx->RequestFile(
+      std::string(ctx->workingFile.GetFullPathNoExt()) + ".ard");
   BinReaderRef dataRd(*dataStream.Get());
 
   rd.Seek(hdr.tailLeafsBuffer);
@@ -81,9 +76,9 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
 
   for (size_t index = 0; auto t : trieBuffer) {
     if (t.a < 0 && t.b > 0) {
-      es::string_view tail = tb - t.a - 4;
+      std::string_view tail = tb - t.a - 4;
       uint32 fileIndex;
-      memcpy(&fileIndex, tail.end() + 1, 4);
+      memcpy(&fileIndex, &*tail.end() + 1, 4);
 
       int32 parentId = t.b;
       int32 curentXor = index;
@@ -96,7 +91,7 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
       }
 
       std::reverse(curPath.begin(), curPath.end());
-      fileNames[fileIndex] = curPath + tail.to_string();
+      fileNames[fileIndex] = curPath + std::string(tail);
     }
 
     index++;
@@ -104,13 +99,14 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
 
   es::Dispose(tailBuffer);
   es::Dispose(trieBuffer);
+  auto ectx = ctx->ExtractContext();
 
-  if (ctx->RequiresFolders()) {
+  if (ectx->RequiresFolders()) {
     for (auto &f : fileNames) {
-      ctx->AddFolderPath(f);
+      ectx->AddFolderPath(f);
     }
 
-    ctx->GenerateFolders();
+    ectx->GenerateFolders();
   }
 
   rd.Seek(hdr.fileEntries);
@@ -126,17 +122,17 @@ void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
       continue;
     }
 
-    ctx->NewFile(fileName);
+    ectx->NewFile(fileName);
 
     dataRd.Seek(entry.dataOffset);
 
     if (entry.compressed) {
       dataRd.ReadContainer(dataBuffer, entry.compressedSize + 64);
       auto data = DecompressXBC1(dataBuffer.data());
-      ctx->SendData(data);
+      ectx->SendData(data);
     } else {
       dataRd.ReadContainer(dataBuffer, entry.compressedSize);
-      ctx->SendData(dataBuffer);
+      ectx->SendData(dataBuffer);
     }
   }
 }

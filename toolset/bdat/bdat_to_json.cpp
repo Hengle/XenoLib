@@ -19,7 +19,6 @@
 #include "datas/binreader_stream.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/reflector.hpp"
 #include "nlohmann/json.hpp"
 #include "project.h"
@@ -32,18 +31,16 @@ static struct BDAT2JSON : ReflectorBase<BDAT2JSON> {
 REFLECT(CLASS(BDAT2JSON),
         MEMBER(extract, "E", ReflDesc{"Extract by data entry if possible."}), );
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".bdat$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::FILTERED,
-    BDAT2JSON_DESC " v" BDAT2JSON_VERSION ", " BDAT2JSON_COPYRIGHT "Lukas Cone",
-    reinterpret_cast<ReflectorFriend *>(&settings),
-    filters,
+    .filteredLoad = true,
+    .header = BDAT2JSON_DESC " v" BDAT2JSON_VERSION ", " BDAT2JSON_COPYRIGHT
+                             "Lukas Cone",
+    .settings = reinterpret_cast<ReflectorFriend *>(&settings),
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -54,7 +51,7 @@ nlohmann::json ToJSON(const Header *hdr) {
   const char *values = hdr->keyValues;
   const KeyDesc *keyDescs = hdr->keyDescs;
   struct Flag {
-    es::string_view name;
+    std::string_view name;
     uint16 index;
     uint16 value;
   };
@@ -114,7 +111,7 @@ nlohmann::json ToJSON(const Header *hdr) {
           throw std::runtime_error("Invalid flag type");
         }
 
-        std::map<es::string_view, bool> flagDict;
+        std::map<std::string_view, bool> flagDict;
 
         for (Flag &f : flags) {
           flagDict.emplace(f.name, data & f.value);
@@ -193,51 +190,46 @@ nlohmann::json ToJSON(const Header *hdr) {
   return jk;
 }
 
-void Extract(BinReaderRef rd, AppExtractContext *ctx) {
+void Extract(AppContext *ctx) {
   {
     Collection col;
-    rd.Push();
-    rd.Read(col);
+    ctx->GetType(col);
 
     if (col.numDatas > 0x10000) {
       FByteswapper(col);
       FByteswapper(col.datas);
     }
 
-    rd.Seek(reinterpret_cast<uint32 &>(col.datas[0]));
     uint32 bdatId;
-    rd.Read(bdatId);
-    rd.Pop();
+    ctx->GetType(bdatId, col.datas[0]);
 
     if (bdatId != BDAT::ID) {
       throw es::InvalidHeaderError(bdatId);
     }
   }
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
+  std::string buffer = ctx->GetBuffer();
   Collection &col = reinterpret_cast<BDAT::V1::Collection &>(*buffer.data());
   ProcessClass(col);
 
   if (settings.extract && col.numDatas > 1) {
+    auto ectx = ctx->ExtractContext();
     for (auto &d : col) {
       const Header *hdr = d;
-      ctx->NewFile(hdr->name.Get() + std::string(".json"));
+      ectx->NewFile(hdr->name.Get() + std::string(".json"));
       auto dumped = ToJSON(hdr).dump(2, ' ');
-      ctx->SendData(dumped);
+      ectx->SendData(dumped);
     }
   } else {
-    AFileInfo finf(ctx->ctx->workingFile);
-    ctx->NewFile(finf.GetFilename().to_string() + ".json");
-    ctx->SendData("{\n");
+    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json"));
+    strWr << "{\n";
 
     for (auto &d : col) {
       const Header *hdr = d;
-      ctx->SendData("\"");
-      ctx->SendData(hdr->name.Get());
-      ctx->SendData("\": ");
-      auto dumped = ToJSON(hdr).dump(2, ' ');
-      ctx->SendData(dumped);
+      strWr << "\"";
+      strWr << hdr->name.Get();
+      strWr << "\": ";
+      strWr << std::setw(2) << ToJSON(hdr);
     }
   }
 }
@@ -308,48 +300,42 @@ nlohmann::json ToJSON(const Header *hdr) {
   return jk;
 }
 
-void Extract(BinReaderRef rd, AppExtractContext *ctx) {
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
+void Extract(AppContext *ctx) {
+  std::string buffer = ctx->GetBuffer();
   Collection &col = reinterpret_cast<Collection &>(*buffer.data());
   ProcessClass(col, {});
 
   if (settings.extract && col.numDatas > 1) {
+    auto ectx = ctx->ExtractContext();
     for (size_t cid = 0; auto &d : col) {
       const Header *hdr = d;
-      ctx->NewFile(std::to_string(cid++) + std::string(".json"));
+      ectx->NewFile(std::to_string(cid++) + std::string(".json"));
       auto dumped = ToJSON(hdr).dump(2, ' ');
-      ctx->SendData(dumped);
+      ectx->SendData(dumped);
     }
   } else {
-    AFileInfo finf(ctx->ctx->workingFile);
-    ctx->NewFile(finf.GetFilename().to_string() + ".json");
-    ctx->SendData("{\n");
+    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json"));
+    strWr << "{\n";
 
     for (auto &d : col) {
       const Header *hdr = d;
-      ctx->SendData("\"");
-      ctx->SendData(finf.GetFilename());
-      ctx->SendData("\": ");
-      auto dumped = ToJSON(hdr).dump(2, ' ');
-      ctx->SendData(dumped);
+      strWr << "\"";
+      strWr << ctx->workingFile.GetFilename();
+      strWr << "\": ";
+      strWr << std::setw(2) << ToJSON(hdr);
     }
   }
 }
 } // namespace BDAT::V4
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
-
+void AppProcessFile(AppContext *ctx) {
   uint32 id;
-  rd.Push();
-  rd.Read(id);
-  rd.Pop();
+  ctx->GetType(id);
 
   if (id == BDAT::ID) {
-    BDAT::V4::Extract(rd, ctx);
+    BDAT::V4::Extract(ctx);
   } else {
-    BDAT::V1::Extract(rd, ctx);
+    BDAT::V1::Extract(ctx);
   }
 }
 

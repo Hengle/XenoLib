@@ -18,6 +18,8 @@
 #include "xenolib/lbim.hpp"
 #include <cassert>
 #include <cstring>
+#include <stdexcept>
+#include <string>
 
 void LBIM::DecodeMipmap(const Header &header, const char *data, char *outData,
                         uint32 mipIndex) {

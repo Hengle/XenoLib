@@ -17,7 +17,6 @@
 
 #pragma once
 #include "datas/pointer.hpp"
-#include "datas/string_view.hpp"
 #include "datas/supercore.hpp"
 #include "xenolib/core.hpp"
 

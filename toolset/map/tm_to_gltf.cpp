@@ -19,10 +19,9 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
+#include "datas/binwritter_stream.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/reflector.hpp"
 #include "gltf.hpp"
 #include "project.h"
@@ -31,19 +30,15 @@
 
 using namespace fx;
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".catm$",
     ".witm$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::ALL,
-    TM2GLTF_DESC " v" TM2GLTF_VERSION ", " TM2GLTF_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .header =
+        TM2GLTF_DESC " v" TM2GLTF_VERSION ", " TM2GLTF_COPYRIGHT "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -239,20 +234,16 @@ auto ProcessBuffers(gltf::Document &main, const TFBH::Stream &stream) {
   return std::make_pair(buffers, beginIndices);
 }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
-
+void AppProcessFile(AppContext *ctx) {
   TMGLTF main;
   main.extensionsRequired.emplace_back("KHR_mesh_quantization");
   main.extensionsUsed.emplace_back("KHR_mesh_quantization");
   gltf::Buffer shared;
-  AFileInfo workingPath(ctx->workingFile);
-
   std::string binhBuffer;
   {
-    std::string lookupPath = workingPath.GetFolder();
-    lookupPath.append(workingPath.GetFilename().substr(
-        0, workingPath.GetFilename().find('_')));
+    std::string lookupPath(ctx->workingFile.GetFolder());
+    lookupPath.append(ctx->workingFile.GetFilename().substr(
+        0, ctx->workingFile.GetFilename().find('_')));
     lookupPath.append("_terrain.binh");
     auto binStream = ctx->RequestFile(lookupPath);
     lookupPath.pop_back();
@@ -275,10 +266,11 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   main.buffers.emplace_back(shared);
 
   MSTM::Wrap mstm;
+  BinReaderRef rd(ctx->GetStream());
 
-  if (workingPath.GetExtension() == ".catm") {
+  if (ctx->workingFile.GetExtension() == ".catm") {
     mstm.LoadV1(rd, {MSTM::Wrap::ExcludeLoad::Shaders});
-  } else if (workingPath.GetExtension() == ".witm") {
+  } else if (ctx->workingFile.GetExtension() == ".witm") {
     mstm.LoadV2(rd, {MSTM::Wrap::ExcludeLoad::Shaders});
   } else {
     throw std::runtime_error("Unsupported format");
@@ -297,8 +289,6 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     ProcessMeshes(main, m.get(), attrs.at(mIndex));
   }
 
-  AFileInfo outPath(ctx->outFile);
-
-  BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".gltf");
-  gltf::Save(main, wr.BaseStream(), outPath.GetFolder(), false);
+  gltf::Save(main, ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")), {},
+             false);
 }

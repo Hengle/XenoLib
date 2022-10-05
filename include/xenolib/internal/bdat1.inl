@@ -65,7 +65,7 @@ struct KVPair {
 
   bool XN_EXTERN operator==(const Value &other) const;
 
-  bool operator==(es::string_view other) const {
+  bool operator==(std::string_view other) const {
     if (IsString()) {
       return other == value->asString.Get();
     }
@@ -109,9 +109,9 @@ struct Header {
   Pointer16<KeyDesc> keyDescs;
   uint16 numKeyDescs;
 
-  const char XN_EXTERN *FindBlock(es::string_view keyName, Value value);
-  const char XN_EXTERN *FindBlock(es::string_view keyName,
-                                  es::string_view value);
+  const char XN_EXTERN *FindBlock(std::string_view keyName, Value value);
+  const char XN_EXTERN *FindBlock(std::string_view keyName,
+                                  std::string_view value);
 };
 
 struct Collection {
@@ -124,6 +124,6 @@ struct Collection {
   const Pointer<Header> *begin() const { return datas; }
   const Pointer<Header> *end() const { return datas + numDatas; }
 
-  const Header XN_EXTERN *FindData(es::string_view name) const;
+  const Header XN_EXTERN *FindData(std::string_view name) const;
 };
 } // namespace V1

@@ -33,7 +33,7 @@ public:
 };
 
 using Morphs = uni::List<Morph>;
-using MorphNames = std::span<const es::string_view>;
+using MorphNames = std::span<const std::string_view>;
 
 class WeightSampler : public uni::Base {
 public:

@@ -18,10 +18,9 @@
 #define ES_COPYABLE_POINTER
 
 #include "datas/app_context.hpp"
-#include "datas/binwritter.hpp"
 #include "datas/binreader.hpp"
+#include "datas/binwritter.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "datas/reflector.hpp"
 #include "datas/stat.hpp"
@@ -37,17 +36,15 @@ static struct SARCreate : ReflectorBase<SARCreate> {
 } settings;
 
 REFLECT(CLASS(SARCreate),
-        MEMBER(extension, "e", ReflDesc{"Set output file extension. (common: sar, chr, mot)"}),
+        MEMBER(extension, "e",
+               ReflDesc{"Set output file extension. (common: sar, chr, mot)"}),
         MEMBERNAME(bigEndian, "big-endian", "e",
                    ReflDesc{"Output platform is big endian."}), );
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::PACK,
-    ArchiveLoadType::ALL,
-    SARCreate_DESC " v" SARCreate_VERSION ", " SARCreate_COPYRIGHT "Lukas Cone",
-    reinterpret_cast<ReflectorFriend *>(&settings),
-    nullptr,
+    .header = SARCreate_DESC " v" SARCreate_VERSION ", " SARCreate_COPYRIGHT
+                             "Lukas Cone",
+    .settings = reinterpret_cast<ReflectorFriend *>(&settings),
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -62,7 +59,7 @@ struct SarMakeContext : AppPackContext {
       : outSar(path), streamStore(path + ".data") {}
   SarMakeContext &operator=(SarMakeContext &&) = default;
 
-  void SendFile(es::string_view path, std::istream &stream) override {
+  void SendFile(std::string_view path, std::istream &stream) override {
     if (path.size() >= sizeof(SAR::FileEntry::fileName)) {
       printwarning("Skipped (filename too long, >=52) " << path);
       return;

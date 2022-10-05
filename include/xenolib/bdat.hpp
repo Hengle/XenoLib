@@ -18,8 +18,9 @@
 #pragma once
 #include "core.hpp"
 #include "datas/pointer.hpp"
-#include "datas/string_view.hpp"
 #include "datas/supercore.hpp"
+#include <string_view>
+#include <stdexcept>
 
 namespace BDAT {
 constexpr static uint32 ID = CompileFourCC("BDAT");
@@ -36,7 +37,7 @@ enum class DataType : uint8 {
   StringPtr,
   Float,
   KeyHash,
-  Unk = 11, // Pointer??
+  Unk = 11,  // Pointer??
   Unk1 = 13, // Child index??
 };
 

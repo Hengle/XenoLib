@@ -17,24 +17,20 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
+#include "datas/binwritter_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "project.h"
 #include "xenolib/arh.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".arh$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::FILTERED,
-    DecARH_DESC " v" DecARH_VERSION ", " DecARH_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header =
+        DecARH_DESC " v" DecARH_VERSION ", " DecARH_COPYRIGHT "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -48,8 +44,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     throw es::InvalidHeaderError(hdr.id);
   }
 
-  AFileInfo outPath(ctx->outFile);
-  BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".arhdec");
+  BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".arhdec")));
   wr.Write(hdr);
 
   rd.Seek(hdr.tailLeafsBuffer);
@@ -79,14 +74,20 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   hdr.trieBufferSize = 0;
   wr.WriteContainer(trieBuffer);
 
-  BinWritter_t<BinCoreOpenMode::Text> wrd(
-      outPath.GetFullPathNoExt().to_string() + ".arhdump");
-  auto &wrds = wrd.BaseStream();
+  rd.Seek(hdr.fileEntries);
+  std::vector<ARH::FileEntry> entries;
+  rd.ReadContainer(entries, hdr.numFiles);
+  hdr.fileEntries = wr.Tell();
+  wr.WriteContainer(entries);
+  wr.Seek(0);
+  wr.Write(hdr);
+
+  auto &wrds = ctx->NewFile(ctx->workingFile.ChangeExtension(".arhdump"));
   auto *tb = reinterpret_cast<const char *>(tailBuffer.data());
 
   for (size_t index = 0; auto t : trieBuffer) {
     if (t.a < 0 && t.b > 0) {
-      es::string_view tail = tb - t.a - 4;
+      std::string_view tail = tb - t.a - 4;
       uint32 fileIndex;
       memcpy(&fileIndex, tail.end() + 1, 4);
 
@@ -107,12 +108,4 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
 
     index++;
   }
-
-  rd.Seek(hdr.fileEntries);
-  std::vector<ARH::FileEntry> entries;
-  rd.ReadContainer(entries, hdr.numFiles);
-  hdr.fileEntries = wr.Tell();
-  wr.WriteContainer(entries);
-  wr.Seek(0);
-  wr.Write(hdr);
 }

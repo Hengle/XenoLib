@@ -81,7 +81,7 @@ struct HeaderImpl : Header {
     }
   }
 
-  const KeyDesc *FindKey(es::string_view name) {
+  const KeyDesc *FindKey(std::string_view name) {
     KeyDesc *ck = keyDescs;
     for (uint16 k = 0; k < numKeyDescs; k++) {
       if (name == ck[k].name.Get()) {
@@ -92,7 +92,8 @@ struct HeaderImpl : Header {
     return nullptr;
   }
 
-  template <class C> const char *FindBlock_(es::string_view keyName, C &value) {
+  template <class C>
+  const char *FindBlock_(std::string_view keyName, C &value) {
     auto key = FindKey(keyName);
 
     if (!key) {
@@ -115,15 +116,16 @@ struct HeaderImpl : Header {
   }
 };
 
-const char *Header::FindBlock(es::string_view keyName, Value value) {
+const char *Header::FindBlock(std::string_view keyName, Value value) {
   return static_cast<HeaderImpl *>(this)->FindBlock_(keyName, value);
 }
 
-const char *Header::FindBlock(es::string_view keyName, es::string_view value) {
+const char *Header::FindBlock(std::string_view keyName,
+                              std::string_view value) {
   return static_cast<HeaderImpl *>(this)->FindBlock_(keyName, value);
 }
 
-const Header *Collection::FindData(es::string_view name) const {
+const Header *Collection::FindData(std::string_view name) const {
   for (auto &h : *this) {
     if (name == h->name.Get()) {
       return h;

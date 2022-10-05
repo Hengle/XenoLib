@@ -18,7 +18,6 @@
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "datas/reflector.hpp"
 #include "latte/latte_disassembler.h"
@@ -28,20 +27,16 @@
 #include "xenolib/mxmd.hpp"
 #include <sstream>
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".camdo$",
     ".cashd$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::FILTERED,
-    SHDExtract_DESC " v" SHDExtract_VERSION ", " SHDExtract_COPYRIGHT
-                    "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header = SHDExtract_DESC " v" SHDExtract_VERSION ", " SHDExtract_COPYRIGHT
+                              "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -69,7 +64,7 @@ REFLECT(ENUMERATION(gx2::ShaderVarType), ENUM_MEMBERNAME(Void, void),
         ENUM_MEMBER(dmat3x4), ENUM_MEMBER(dmat4x2), ENUM_MEMBER(dmat4x3),
         ENUM_MEMBER(dmat4), )
 
-void ExtractMTHS(char *buffer, AppExtractContext *ctx, es::string_view name) {
+void ExtractMTHS(char *buffer, AppContext *ctx, std::string_view name) {
   auto hdr = reinterpret_cast<MTHS::Header *>(buffer);
   ProcessClass(*hdr);
   std::stringstream output;
@@ -139,9 +134,11 @@ void ExtractMTHS(char *buffer, AppExtractContext *ctx, es::string_view name) {
     output << disProg;
   };
 
+  auto ectx = ctx->ExtractContext();
+
   if (hdr->vertexShader) {
     MTHS::VertexShader *vsh = hdr->vertexShader;
-    ctx->NewFile(name.to_string() + ".vert");
+    ectx->NewFile(std::string(name) + ".vert");
     DumpSamplers(*vsh);
     DumpAttributes(*vsh);
     DumpUniformVars(*vsh);
@@ -149,26 +146,25 @@ void ExtractMTHS(char *buffer, AppExtractContext *ctx, es::string_view name) {
     Disassemble(*vsh);
     auto str = output.str();
     output = {};
-    ctx->SendData(str);
+    ectx->SendData(str);
   }
 
   if (hdr->fragmentShader) {
-    ctx->NewFile(name.to_string() + ".frag");
+    ectx->NewFile(std::string(name) + ".frag");
     MTHS::FragmentShader *fsh = hdr->fragmentShader;
     DumpSamplers(*fsh);
     DumpUniformVars(*fsh);
     DumpUniformBlocks(*fsh);
     Disassemble(*fsh);
-    auto str = output.str();
-    output = {};
-    ctx->SendData(str);
+    auto str = output.view();
+    ectx->SendData(str);
   }
 }
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-void ExtractMXMD(BinReaderRef rd, AppExtractContext *ctx) {
+void ExtractMXMD(BinReaderRef rd, AppContext *ctx) {
   MXMD::Wrap mxmd;
   using ex = MXMD::Wrap::ExcludeLoad;
   mxmd.Load(rd, {},
@@ -176,7 +172,7 @@ void ExtractMXMD(BinReaderRef rd, AppExtractContext *ctx) {
   auto var = MXMD::GetVariantFromWrapper(mxmd);
 
   std::visit(overloaded{
-                 [ctx, rd](MXMD::V1::Header &hdr) {
+                 [ctx](MXMD::V1::Header &hdr) {
                    if (hdr.shaders) {
                      for (size_t index = 0; auto &s : hdr.shaders->shaders) {
                        // todo name from material + lod
@@ -185,29 +181,25 @@ void ExtractMXMD(BinReaderRef rd, AppExtractContext *ctx) {
                      }
                    }
                  },
-                 [ctx, rd](MXMD::V2::Header &) {
+                 [](MXMD::V2::Header &) {
                    throw std::runtime_error("Not implemented");
                  },
-                 [ctx, rd](MXMD::V3::Header &) {
+                 [](MXMD::V3::Header &) {
                    throw std::runtime_error("Not implemented");
                  },
              },
              var);
 }
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
+void AppProcessFile(AppContext *ctx) {
   uint32 id;
-  rd.Push();
-  rd.Read(id);
-  rd.Pop();
-  std::string buffer;
+  ctx->GetType(id);
 
   if (id == MTHS::ID) {
-    rd.ReadContainer(buffer, rd.GetSize());
-    AFileInfo info(ctx->ctx->workingFile);
-    ExtractMTHS(buffer.data(), ctx, info.GetFilename());
+    std::string buffer = ctx->GetBuffer();
+    ExtractMTHS(buffer.data(), ctx, ctx->workingFile.GetFilename());
   } else if (id == MXMD::ID || id == MXMD::ID_BIG) {
+    BinReaderRef rd(ctx->GetStream());
     ExtractMXMD(rd, ctx);
   } else {
     throw es::InvalidHeaderError(id);

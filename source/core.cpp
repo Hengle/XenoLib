@@ -16,6 +16,7 @@
 */
 
 #include "xenolib/core.hpp"
+#include <stdexcept>
 
 void ProcessFlags::NoAutoDetect() const {
   if (*this == ProcessFlag::AutoDetectEndian) {

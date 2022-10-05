@@ -17,25 +17,21 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
+#include "datas/binwritter_stream.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "project.h"
 #include "xenolib/bdat.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".bdat$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::FILTERED,
-    DecBDAT_DESC " v" DecBDAT_VERSION ", " DecBDAT_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header =
+        DecBDAT_DESC " v" DecBDAT_VERSION ", " DecBDAT_COPYRIGHT "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -44,7 +40,7 @@ namespace BDAT::V1 {
 struct HeaderImpl : Header {
   void XN_EXTERN DecryptSection(char *, char *);
 };
-} // namespace BDAT
+} // namespace BDAT::V1
 
 void AppProcessFile(std::istream &stream, AppContext *ctx) {
   BinReaderRef rd(stream);
@@ -72,7 +68,8 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
 
   std::string buffer;
   rd.ReadContainer(buffer, rd.GetSize());
-  BDAT::V1::Collection &col = reinterpret_cast<BDAT::V1::Collection &>(*buffer.data());
+  BDAT::V1::Collection &col =
+      reinterpret_cast<BDAT::V1::Collection &>(*buffer.data());
   if (endianBig) {
     FByteswapper(col);
   }
@@ -92,8 +89,8 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       (item.Fixup(hbase), ...);
     }(hdr->name, hdr->unk1Offset, hdr->keyValues, hdr->strings, hdr->keyDescs);
 
-    static_cast<BDAT::V1::HeaderImpl *>(hdr)->DecryptSection(hdr->name.Get(),
-                                                         hdr->unk1Offset.Get());
+    static_cast<BDAT::V1::HeaderImpl *>(hdr)->DecryptSection(
+        hdr->name.Get(), hdr->unk1Offset.Get());
 
     if (char *strings = hdr->strings; hdr->stringsSize) {
       static_cast<BDAT::V1::HeaderImpl *>(hdr)->DecryptSection(
@@ -101,7 +98,6 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     }
   }
 
-  AFileInfo outPath(ctx->outFile);
-  BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".bdatdec");
+  BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".bdatdec")));
   wr.WriteContainer(buffer);
 }

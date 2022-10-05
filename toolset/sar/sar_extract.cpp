@@ -18,54 +18,38 @@
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "project.h"
 #include "xenolib/sar.hpp"
 
-es::string_view filters[]{
-    ".sar$",
-    ".chr$",
-    ".mot$",
-    ".arc$",
-    {},
-};
+std::string_view filters[]{".sar$", ".chr$", ".mot$", ".arc$"};
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::FILTERED,
-    SARExtract_DESC " v" SARExtract_VERSION ", " SARExtract_COPYRIGHT
-                    "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header = SARExtract_DESC " v" SARExtract_VERSION ", " SARExtract_COPYRIGHT
+                              "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
-  AFileInfo info(ctx->ctx->workingFile);
-
+void AppProcessFile(AppContext *ctx) {
   {
     SAR::Header hdr;
-    rd.Push();
-    rd.Read(hdr);
-    rd.Pop();
+    ctx->GetType(hdr);
 
     if (hdr.id != SAR::ID && hdr.id != SAR::ID_BIG) {
       throw es::InvalidHeaderError(hdr.id);
     }
   }
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
-
+  auto buffer = ctx->GetBuffer();
   SAR::Header *hdr = reinterpret_cast<SAR::Header *>(buffer.data());
   ProcessClass(*hdr);
+  auto ectx = ctx->ExtractContext();
 
   for (auto &e : hdr->entries) {
-    ctx->NewFile(e.fileName);
-    ctx->SendData({e.data.Get(), e.dataSize});
+    ectx->NewFile(e.fileName);
+    ectx->SendData({e.data.Get(), e.dataSize});
   }
 }
 

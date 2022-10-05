@@ -17,27 +17,22 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "datas/reflector.hpp"
 #include "nlohmann/json.hpp"
 #include "project.h"
 #include "xenolib/bc/asmb.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".asm$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::FILTERED,
-    ASM2JSON_DESC " v" ASM2JSON_VERSION ", " ASM2JSON_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header = ASM2JSON_DESC " v" ASM2JSON_VERSION ", " ASM2JSON_COPYRIGHT
+                            "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -538,22 +533,17 @@ void ToJSON(A2::Assembly *asmb, nlohmann::json &main) {
   }
 }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
-
+void AppProcessFile(AppContext *ctx) {
   {
     BC::Header hdr;
-    rd.Push();
-    rd.Read(hdr);
-    rd.Pop();
+    ctx->GetType(hdr);
 
     if (hdr.id != BC::ID) {
       throw es::InvalidHeaderError(hdr.id);
     }
   }
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
+  std::string buffer = ctx->GetBuffer();
   BC::Header *hdr = reinterpret_cast<BC::Header *>(buffer.data());
   ProcessClass(*hdr, {});
 
@@ -566,8 +556,6 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
 
   std::visit([&main](auto v) { ToJSON(v, main); }, asmb->Get());
 
-  AFileInfo outPath(ctx->outFile);
-  BinWritter_t<BinCoreOpenMode::Text> wr(
-      outPath.GetFullPathNoExt().to_string() + ".json");
-  wr.BaseStream() << std::setw(2) << main;
+  ctx->NewFile(ctx->workingFile.ChangeExtension(".json"))
+      << std::setw(2) << main;
 }

@@ -19,7 +19,7 @@
 #include "addrlib.inl"
 #include "datas/endian.hpp"
 #include <cassert>
-#include <cstring>
+#include <string>
 
 template <> void XN_EXTERN FByteswapper(MTXT::Header &item, bool) {
   FArraySwapper(item);

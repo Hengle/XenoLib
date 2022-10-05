@@ -19,10 +19,8 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/matrix44.hpp"
 #include "datas/reflector.hpp"
 #include "gltf.hpp"
@@ -34,19 +32,15 @@
 
 using namespace fx;
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".caim$",
     ".wiim$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::ALL,
-    IM2GLTF_DESC " v" IM2GLTF_VERSION ", " IM2GLTF_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .header =
+        IM2GLTF_DESC " v" IM2GLTF_VERSION ", " IM2GLTF_COPYRIGHT "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -328,20 +322,16 @@ auto ProcessBuffers(gltf::Document &main, const TFBH::Stream &stream) {
   return std::make_pair(buffers, beginIndices);
 }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
-
+void AppProcessFile(AppContext *ctx) {
   IMGLTF main;
   main.extensionsRequired.emplace_back("KHR_mesh_quantization");
   main.extensionsUsed.emplace_back("KHR_mesh_quantization");
   gltf::Buffer shared;
-  AFileInfo workingPath(ctx->workingFile);
-
   std::string binhBuffer;
   {
-    std::string lookupPath = workingPath.GetFolder();
-    lookupPath.append(workingPath.GetFilename().substr(
-        0, workingPath.GetFilename().find('_')));
+    std::string lookupPath(ctx->workingFile.GetFolder());
+    lookupPath.append(ctx->workingFile.GetFilename().substr(
+        0, ctx->workingFile.GetFilename().find('_')));
     lookupPath.append("_oj.binh");
     auto binStream = ctx->RequestFile(lookupPath);
     lookupPath.pop_back();
@@ -365,10 +355,11 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   main.buffers.emplace_back(shared);
 
   MSIM::Wrap msim;
+  BinReaderRef rd(ctx->GetStream());
 
-  if (workingPath.GetExtension() == ".caim") {
+  if (ctx->workingFile.GetExtension() == ".caim") {
     msim.LoadV1(rd, {MSIM::Wrap::ExcludeLoad::Shaders});
-  } else if (workingPath.GetExtension() == ".wiim") {
+  } else if (ctx->workingFile.GetExtension() == ".wiim") {
     msim.LoadV2(rd, {MSIM::Wrap::ExcludeLoad::Shaders});
   } else {
     throw std::runtime_error("Unsupported format");
@@ -387,14 +378,12 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     ProcessMeshes(main, m.get(), attrs.at(mIndex));
   }
 
-  AFileInfo outPath(ctx->outFile);
-
   if (main.NumStreams() > 0) {
     main.extensionsRequired.emplace_back("EXT_mesh_gpu_instancing");
     main.extensionsUsed.emplace_back("EXT_mesh_gpu_instancing");
 
-    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".glb");
-    main.FinishAndSave(wr, outPath.GetFolder());
+    main.FinishAndSave(ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")),
+                       {});
   } else {
     main.buffers.erase(main.buffers.begin());
 
@@ -402,7 +391,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
       w.buffer = 0;
     }
 
-    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".gltf");
-    gltf::Save(main, wr.BaseStream(), outPath.GetFolder(), false);
+    gltf::Save(main, ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")),
+               {}, false);
   }
 }

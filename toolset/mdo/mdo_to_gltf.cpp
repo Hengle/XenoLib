@@ -18,10 +18,9 @@
 #include "datas/aabb.hpp"
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
+#include "datas/binwritter_stream.hpp"
 #include "datas/endian.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "datas/matrix44.hpp"
 #include "datas/reflector.hpp"
@@ -33,10 +32,9 @@
 #include "xenolib/mxmd.hpp"
 #include "xenolib/sar.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".camdo$",
     ".wimdo$",
-    {},
 };
 
 static struct MDO2GLTF : ReflectorBase<MDO2GLTF> {
@@ -49,19 +47,16 @@ REFLECT(CLASS(MDO2GLTF),
                        "Fallback skeleton file name if none wasn't found."}), );
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::ALL,
-    MDO2GLTF_DESC " v" MDO2GLTF_VERSION ", " MDO2GLTF_COPYRIGHT "Lukas Cone",
-    reinterpret_cast<ReflectorFriend *>(&settings),
-    filters,
+    .header = MDO2GLTF_DESC " v" MDO2GLTF_VERSION ", " MDO2GLTF_COPYRIGHT
+                            "Lukas Cone",
+    .settings = reinterpret_cast<ReflectorFriend *>(&settings),
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
 struct MainGLTF : GLTF {
   void LoadSkeleton(AppContext *ctx) {
-    AFileInfo outPath(ctx->workingFile);
     AppContextStream skelArc;
     std::string buffer;
 
@@ -95,7 +90,7 @@ struct MainGLTF : GLTF {
       ProcessClass(*sar);
 
       for (auto &f : sar->entries) {
-        es::string_view fname(f.fileName);
+        std::string_view fname(f.fileName);
 
         if (fname == "skeleton" || fname.ends_with(".skl")) {
           return f.data;
@@ -104,10 +99,11 @@ struct MainGLTF : GLTF {
       return nullptr;
     };
 
-    auto skelData = TryFindSkeleton(outPath.GetFullPathNoExt());
+    auto skelData =
+        TryFindSkeleton(std::string(ctx->workingFile.GetFullPathNoExt()));
 
     if (!skelData && !settings.fallbackSkeletonFilename.empty()) {
-      skelData = TryFindSkeleton(outPath.GetFolder().to_string() +
+      skelData = TryFindSkeleton(std::string(ctx->workingFile.GetFolder()) +
                                  settings.fallbackSkeletonFilename);
     }
 
@@ -759,14 +755,11 @@ private:
   int32 sparsexStream = -1;
 };
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
+void AppProcessFile(AppContext *ctx) {
   bool isXC = false;
   {
     MXMD::HeaderBase base;
-    rd.Push();
-    rd.Read(base);
-    rd.Pop();
+    ctx->GetType(base);
 
     if (base.magic == MXMD::ID_BIG) {
       FByteswapper(base);
@@ -786,11 +779,11 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   main.extensionsUsed.emplace_back("KHR_mesh_quantization");
 
   MXMD::Wrap mxmd;
+  BinReaderRef rd(ctx->GetStream());
 
   if (isXC) {
-    AFileInfo workingPath(ctx->workingFile);
-    AppContextStream stream =
-        ctx->RequestFile(workingPath.GetFullPathNoExt().to_string() + ".wismt");
+    AppContextStream stream = ctx->RequestFile(
+        std::string(ctx->workingFile.GetFullPathNoExt()) + ".wismt");
     mxmd.Load(rd, *stream.Get());
   } else {
     mxmd.Load(rd, {});
@@ -801,8 +794,6 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   main.ProcessSkins(model, skeleton);
   main.ProcessMeshes(model);
 
-  AFileInfo outPath(ctx->outFile);
-  BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".glb");
-
-  main.FinishAndSave(wr, outPath.GetFolder());
+  main.FinishAndSave(ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")),
+                     {});
 }

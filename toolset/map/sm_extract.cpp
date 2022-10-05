@@ -22,7 +22,6 @@
 #include "datas/binreader_stream.hpp"
 #include "datas/binwritter_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "datas/master_printer.hpp"
 #include "dds.hpp"
 #include "project.h"
@@ -33,22 +32,17 @@
 #include <map>
 #include <sstream>
 
-#include "datas/binwritter.hpp"
 #include "datas/vectors_stream.hpp"
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".casmhd$",
     ".wismhd$",
-    {},
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::ALL,
-    SMExtract_DESC " v" SMExtract_VERSION ", " SMExtract_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .header = SMExtract_DESC " v" SMExtract_VERSION ", " SMExtract_COPYRIGHT
+                             "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -566,37 +560,35 @@ void ExtractV2(MSMD::V2::Header &hdr, AppExtractContext *ctx,
   }
 }
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
-  auto dataFile = ctx->ctx->workingFile;
+void AppProcessFile(AppContext *ctx) {
+  std::string dataFile(ctx->workingFile.GetFullPath());
   dataFile.replace(dataFile.size() - 2, 2, "da");
-  auto dataStream = ctx->ctx->RequestFile(dataFile);
-  AFileInfo info(dataFile);
+  auto dataStream = ctx->RequestFile(dataFile);
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
+  std::string buffer = ctx->GetBuffer();
 
   auto hdr = reinterpret_cast<MSMD::HeaderBase *>(buffer.data());
   ProcessClass(*hdr);
+  auto ectx = ctx->ExtractContext();
 
-  if (ctx->RequiresFolders()) {
+  if (ectx->RequiresFolders()) {
     static const char *folders[]{
         "tex/m/", "tex/h/", "tgld",  "skybox", "collision", "grass",
         "effect", "unk00",  "unk01", "unk02",  "bvsc",      "landmark",
     };
 
     for (auto f : folders) {
-      ctx->AddFolderPath(f);
+      ectx->AddFolderPath(f);
     }
 
-    ctx->GenerateFolders();
+    ectx->GenerateFolders();
   }
 
   if (hdr->version == MSMD::Version::V10011) {
-    ExtractV1(static_cast<MSMD::V1::Header &>(*hdr), ctx, dataStream,
-              info.GetFilename());
+    ExtractV1(static_cast<MSMD::V1::Header &>(*hdr), ectx, dataStream,
+              std::string(ctx->workingFile.GetFilename()));
   } else {
-    ExtractV2(static_cast<MSMD::V2::Header &>(*hdr), ctx, dataStream,
-              info.GetFilename());
+    ExtractV2(static_cast<MSMD::V2::Header &>(*hdr), ectx, dataStream,
+              std::string(ctx->workingFile.GetFilename()));
   }
 }

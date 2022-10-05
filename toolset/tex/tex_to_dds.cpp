@@ -17,37 +17,31 @@
 
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
-#include "datas/binwritter.hpp"
-#include "datas/fileinfo.hpp"
+#include "datas/binwritter_stream.hpp"
 #include "datas/master_printer.hpp"
 #include "dds.hpp"
 #include "project.h"
 #include "xenolib/xbc1.hpp"
 
-es::string_view filters[]{
-    ".catex$", ".witex$", ".wismt$", ".calut$", ".witx$", ".pcsmt$", {},
+std::string_view filters[]{
+    ".catex$", ".witex$", ".wismt$", ".calut$", ".witx$", ".pcsmt$",
 };
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::CONVERT,
-    ArchiveLoadType::FILTERED,
-    TEX2DDS_DESC " v" TEX2DDS_VERSION ", " TEX2DDS_COPYRIGHT "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header =
+        TEX2DDS_DESC " v" TEX2DDS_VERSION ", " TEX2DDS_COPYRIGHT "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
-  AFileInfo outPath(ctx->outFile);
-  AFileInfo workingPath(ctx->workingFile);
+void AppProcessFile(AppContext *ctx) {
   std::string texData;
   std::string hiData;
 
-  if (workingPath.GetExtension() == ".wismt") {
-    auto folder = workingPath.GetFolder();
+  if (ctx->workingFile.GetExtension() == ".wismt") {
+    auto folder = ctx->workingFile.GetFolder();
 
     if (!folder.ends_with("tex/nx/m/")) {
       printwarning("Supplied wismt file folder is not tex/nx/m, skipping");
@@ -55,46 +49,42 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     }
 
     uint32 id;
-    rd.Push();
-    if (rd.Read(id); id != CompileFourCC("xbc1")) {
+    if (ctx->GetType(id); id != CompileFourCC("xbc1")) {
       printinfo("File is stream, not texture, skipping.");
       return;
     }
 
-    rd.Pop();
-    std::string buffer;
-    rd.ReadContainer(buffer, rd.GetSize());
+    std::string buffer = ctx->GetBuffer();
     texData = DecompressXBC1(buffer.data());
 
-    auto hiStream =
-        ctx->RequestFile(folder.to_string().replace(folder.size() - 2, 1, "h") +
-                         workingPath.GetFilenameExt().to_string());
+    auto hiStream = ctx->RequestFile(
+        std::string(folder).replace(folder.size() - 2, 1, "h") +
+        std::string(ctx->workingFile.GetFilenameExt()));
     BinReaderRef hird(*hiStream.Get());
     hird.ReadContainer(buffer, hird.GetSize());
     hiData = DecompressXBC1(buffer.data());
-  } else if (workingPath.GetExtension() == ".pcsmt") {
+  } else if (ctx->workingFile.GetExtension() == ".pcsmt") {
     uint32 id;
-    rd.Push();
-    if (rd.Read(id); id != CompileFourCC("xbc1")) {
+    if (ctx->GetType(id); id != CompileFourCC("xbc1")) {
       printinfo("File is stream, not texture, skipping.");
       return;
     }
 
-    rd.Pop();
-    std::string buffer;
-    rd.ReadContainer(buffer, rd.GetSize());
+    std::string buffer = ctx->GetBuffer();
     texData = DecompressXBC1(buffer.data());
 
-    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".dds");
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
+
     wr.WriteContainer(texData);
     return;
   } else {
-    rd.ReadContainer(texData, rd.GetSize());
+    texData = ctx->GetBuffer();
   }
 
   if (auto hdr = MTXT::Mount(texData); hdr->id == MTXT::ID) {
     FByteswapper(*const_cast<MTXT::Header *>(hdr));
-    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".dds");
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
+
     auto dds = ToDDS(hdr);
     wr.Write(dds);
     std::string outBuffer;
@@ -103,7 +93,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     MTXT::DecodeMipmap(*hdr, texData.data(), outBuffer.data());
     wr.WriteContainer(outBuffer);
   } else if (auto hdr = LBIM::Mount(texData); hdr->id == LBIM::ID) {
-    BinWritter wr(outPath.GetFullPathNoExt().to_string() + ".dds");
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
 
     if (!hiData.empty()) {
       auto mutHdr = const_cast<LBIM::Header *>(hdr);

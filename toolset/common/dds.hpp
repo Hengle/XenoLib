@@ -127,7 +127,7 @@ template <class C> void SendDDS(const C *hdr, AppExtractContext *ctx) {
   ctx->SendData({reinterpret_cast<const char *>(&ddtex), ddtex.DDS_SIZE});
 };
 
-void SendTexelsLB(es::string_view texData, AppExtractContext *ctx) {
+void SendTexelsLB(std::string_view texData, AppExtractContext *ctx) {
   std::string mipOut;
   mipOut.resize(texData.size());
   auto tex = LBIM::Mount(texData);
@@ -136,7 +136,7 @@ void SendTexelsLB(es::string_view texData, AppExtractContext *ctx) {
   ctx->SendData(mipOut);
 }
 
-void SendTexelsGTX(es::string_view texData, AppExtractContext *ctx) {
+void SendTexelsGTX(std::string_view texData, AppExtractContext *ctx) {
   std::string mipOut;
   mipOut.resize(texData.size());
   auto tex = MTXT::Mount(texData);

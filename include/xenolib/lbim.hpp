@@ -18,7 +18,7 @@
 #pragma once
 #include "core.hpp"
 #include "datas/supercore.hpp"
-#include "datas/string_view.hpp"
+#include <string_view>
 
 namespace LBIM {
 static constexpr uint32 ID = CompileFourCC("LBIM");
@@ -57,10 +57,11 @@ struct Header {
   uint32 id;
 };
 
-const Header *Mount(es::string_view data) {
-  return reinterpret_cast<const Header *>(data.end() - sizeof(Header));
+const Header *Mount(std::string_view data) {
+  return reinterpret_cast<const Header *>(&*data.end() - sizeof(Header));
 }
 
-void XN_EXTERN DecodeMipmap(const Header &header, const char *data, char *outData, uint32 mipIndex = 0);
+void XN_EXTERN DecodeMipmap(const Header &header, const char *data,
+                            char *outData, uint32 mipIndex = 0);
 
 } // namespace LBIM

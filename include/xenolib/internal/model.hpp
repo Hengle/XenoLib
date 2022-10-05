@@ -496,7 +496,7 @@ public:
   uni::VectorList<uni::IndexArray, IndexBuffer> indexArrays;
   uni::VectorList<Morph, V3Morph> morphs;
   std::optional<V3WeightSamplers_t> weightSamplers;
-  std::vector<es::string_view> morphNames;
+  std::vector<std::string_view> morphNames;
   std::string streamBuffer;
   V3::Stream *stream = nullptr;
 

@@ -122,7 +122,7 @@ static const uint32 crcTable[0x100]{
     0x1AFCBA79, 0x7519549D, 0x490A87FF, 0x8820C3A0,
 };
 
-uint32 CRC32C(es::string_view str) {
+uint32 CRC32C(std::string_view str) {
   if (str.empty()) {
     return 0;
   }

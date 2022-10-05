@@ -18,7 +18,6 @@
 #include "datas/app_context.hpp"
 #include "datas/binreader_stream.hpp"
 #include "datas/except.hpp"
-#include "datas/fileinfo.hpp"
 #include "dds.hpp"
 #include "project.h"
 #include "xenolib/drsm.hpp"
@@ -27,24 +26,20 @@
 #include "xenolib/xbc1.hpp"
 #include <set>
 
-es::string_view filters[]{
+std::string_view filters[]{
     ".wismt$",
     ".casmt$",
     ".pcsmt$",
-    {},
 };
 
 static constexpr bool DEV_EXTRACT_MODEL = false;
 static constexpr bool DEV_EXTRACT_ALL = false;
 
 static AppInfo_s appInfo{
-    AppInfo_s::CONTEXT_VERSION,
-    AppMode_e::EXTRACT,
-    ArchiveLoadType::FILTERED,
-    SMTExtract_DESC " v" SMTExtract_VERSION ", " SMTExtract_COPYRIGHT
-                    "Lukas Cone",
-    nullptr,
-    filters,
+    .filteredLoad = true,
+    .header = SMTExtract_DESC " v" SMTExtract_VERSION ", " SMTExtract_COPYRIGHT
+                              "Lukas Cone",
+    .filters = filters,
 };
 
 AppInfo_s *AppInitModule() { return &appInfo; }
@@ -61,20 +56,17 @@ struct LocalCache {
   }
 };
 
-void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
+void TryExtractDRSM(AppContext *ctx) {
   {
     DRSM::Header hdr;
-    rd.Push();
-    rd.Read(hdr);
-    rd.Pop();
+    ctx->GetType(hdr);
 
     if (hdr.id != DRSM::ID) {
       throw es::InvalidHeaderError(hdr.id);
     }
   }
 
-  std::string buffer;
-  rd.ReadContainer(buffer, rd.GetSize());
+  std::string buffer = ctx->GetBuffer();
 
   DRSM::Header *hdr = reinterpret_cast<DRSM::Header *>(buffer.data());
   ProcessClass(*hdr);
@@ -83,12 +75,13 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
   DRSM::Stream *streams = resources->streams.items;
   DRSM::StreamEntry *entries = resources->streamEntries.items;
   LocalCache cache;
+  auto ectx = ctx->ExtractContext();
 
   if constexpr (DEV_EXTRACT_ALL) {
     for (size_t index = 0; auto &s : resources->streams) {
-      ctx->NewFile(std::to_string(index++));
+      ectx->NewFile(std::to_string(index++));
       auto buffer = s.GetData();
-      ctx->SendData(buffer);
+      ectx->SendData(buffer);
     }
 
     return;
@@ -98,17 +91,17 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
     const char *main = cache.GetSet(*streams, 0);
 
     {
-      ctx->NewFile("vertexindexbuffer");
+      ectx->NewFile("vertexindexbuffer");
       auto &entry = entries[resources->modelStreamEntryIndex];
-      es::string_view viStream(main + entry.offset, entry.size);
-      ctx->SendData(viStream);
+      std::string_view viStream(main + entry.offset, entry.size);
+      ectx->SendData(viStream);
     }
 
     {
-      ctx->NewFile("shaders.wishp");
+      ectx->NewFile("shaders.wishp");
       auto &entry = entries[resources->shaderStreamEntryIndex];
-      es::string_view shStream(main + entry.offset, entry.size);
-      ctx->SendData(shStream);
+      std::string_view shStream(main + entry.offset, entry.size);
+      ectx->SendData(shStream);
     }
 
     if (!textures) {
@@ -144,9 +137,9 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
       auto middleTextures =
           cache.GetSet(streams[resources->middleTexturesStreamIndex], 1);
 
-      es::string_view miMip(middleTextures + entry.offset, entry.size);
+      std::string_view miMip(middleTextures + entry.offset, entry.size);
       auto tex = LBIM::Mount(miMip);
-      ctx->NewFile(t.name.Get() + std::string(".dds"));
+      ectx->NewFile(t.name.Get() + std::string(".dds"));
       numProcessedTextures++;
 
       if (entry.unkIndex > resources->middleTexturesStreamIndex) {
@@ -158,33 +151,33 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
         auto texCopy = *tex;
         texCopy.width *= 2;
         texCopy.height *= 2;
-        SendDDS(&texCopy, ctx);
+        SendDDS(&texCopy, ectx);
         LBIM::DecodeMipmap(texCopy, hiMip.data(), hiMipOut.data());
-        ctx->SendData(hiMipOut);
+        ectx->SendData(hiMipOut);
       } else {
         std::string miMipOut;
         miMipOut.resize(miMip.size());
-        SendDDS(tex, ctx);
+        SendDDS(tex, ectx);
         LBIM::DecodeMipmap(*tex, miMip.data(), miMipOut.data());
-        ctx->SendData(miMipOut);
+        ectx->SendData(miMipOut);
       }
 
     } else {
       numProcessedTextures++;
-      ctx->NewFile(t.name.Get() + std::string(".dds"));
+      ectx->NewFile(t.name.Get() + std::string(".dds"));
       auto &entry = entries[resources->lowTexturesStreamEntryIndex];
       auto loMips = cache.GetSet(streams[resources->lowTexturesStreamIndex], 0);
-      es::string_view loMip(loMips + entry.offset + t.lowOffset, t.lowSize);
+      std::string_view loMip(loMips + entry.offset + t.lowOffset, t.lowSize);
 
-      if (loMip.begins_with("DDS")) {
-        ctx->SendData(loMip);
+      if (loMip.starts_with("DDS")) {
+        ectx->SendData(loMip);
       } else {
         std::string loMipOut;
         loMipOut.resize(loMip.size());
         auto tex = LBIM::Mount(loMip);
-        SendDDS(tex, ctx);
+        SendDDS(tex, ectx);
         LBIM::DecodeMipmap(*tex, loMip.data(), loMipOut.data());
-        ctx->SendData(loMipOut);
+        ectx->SendData(loMipOut);
       }
     }
   }
@@ -195,10 +188,11 @@ void TryExtractDRSM(BinReaderRef rd, AppExtractContext *ctx) {
 }
 
 void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
-                   DRSM::Textures *cachedTextures, AppExtractContext *ctx,
-                   void (*dataSender)(es::string_view texData,
+                   DRSM::Textures *cachedTextures, AppContext *ctx,
+                   void (*dataSender)(std::string_view texData,
                                       AppExtractContext *ctx)) {
-  std::set<es::string_view> processedTextures;
+  std::set<std::string_view> processedTextures;
+  auto ectx = ctx->ExtractContext();
 
   if (hdr) {
     for (int32 g = hdr->numUsedGroups - 1; g >= 0; g--) {
@@ -208,15 +202,15 @@ void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
       rd.ReadContainer(buffer, hdr->dataSizes[g]);
 
       for (auto &t : textures->textures) {
-        es::string_view tName(t.name.Get());
+        std::string_view tName(t.name.Get());
         if (processedTextures.contains(tName)) {
           continue;
         }
 
         processedTextures.emplace(tName);
-        ctx->NewFile(tName.to_string() + ".dds");
-        es::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
-        dataSender(texData, ctx);
+        ectx->NewFile(std::string(tName) + ".dds");
+        std::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
+        dataSender(texData, ectx);
       }
     }
   }
@@ -226,27 +220,28 @@ void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
   }
 
   for (auto &t : cachedTextures->textures) {
-    es::string_view tName(t.name.Get());
+    std::string_view tName(t.name.Get());
     if (processedTextures.contains(tName)) {
       continue;
     }
 
-    ctx->NewFile(tName.to_string() + ".dds");
+    ectx->NewFile(std::string(tName) + ".dds");
 
-    es::string_view texData(
+    std::string_view texData(
         reinterpret_cast<char *>(cachedTextures) + t.lowOffset, t.lowSize);
-    dataSender(texData, ctx);
+    dataSender(texData, ectx);
   }
 }
 
 void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
-                   DRSM::Textures *lowTextures, AppExtractContext *ctx) {
-  std::set<es::string_view> processedTextures;
+                   DRSM::Textures *lowTextures, AppContext *ctx) {
+  std::set<std::string_view> processedTextures;
+  auto ectx = ctx->ExtractContext();
 
   if (hdr) {
     for (int32 g = hdr->numUsedGroups - 1; g >= 0; g--) {
       auto textures = hdr->groups[g].Get();
-      std::string buffer = [rd, ctx, g, hdr] {
+      std::string buffer = [rd, g, hdr] {
         std::string buffer;
         rd.Seek(hdr->dataOffsets[g]);
         rd.ReadContainer(buffer, hdr->compressedSize[g]);
@@ -254,16 +249,16 @@ void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
       }();
 
       for (auto &t : textures->textures) {
-        es::string_view tName(t.name.Get());
+        std::string_view tName(t.name.Get());
         if (processedTextures.contains(tName)) {
           continue;
         }
 
         processedTextures.emplace(tName);
-        ctx->NewFile(tName.to_string() + ".dds");
+        ectx->NewFile(std::string(tName) + ".dds");
 
-        es::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
-        SendTexelsLB(texData, ctx);
+        std::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
+        SendTexelsLB(texData, ectx);
       }
     }
   }
@@ -273,34 +268,35 @@ void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
   }
 
   for (auto &t : lowTextures->textures) {
-    es::string_view tName(t.name.Get());
+    std::string_view tName(t.name.Get());
     if (processedTextures.contains(tName)) {
       continue;
     }
 
-    ctx->NewFile(tName.to_string() + ".dds");
+    ectx->NewFile(std::string(tName) + ".dds");
 
-    es::string_view texData(reinterpret_cast<char *>(lowTextures) + t.lowOffset,
-                            t.lowSize);
-    SendTexelsLB(texData, ctx);
+    std::string_view texData(
+        reinterpret_cast<char *>(lowTextures) + t.lowOffset, t.lowSize);
+    SendTexelsLB(texData, ectx);
   }
 }
 
 template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
-void TryExtactMDO(BinReaderRef rd, AppExtractContext *ctx) {
-  auto mdoPath = ctx->ctx->workingFile;
+void TryExtactMDO(AppContext *ctx) {
+  std::string mdoPath(ctx->workingFile.GetFullPath());
   mdoPath.replace(mdoPath.size() - 3, 3, "mdo");
   MXMD::Wrap mxmd;
   {
-    auto mdoStream = ctx->ctx->RequestFile(mdoPath);
+    auto mdoStream = ctx->RequestFile(mdoPath);
     BinReaderRef mdo(*mdoStream.Get());
     using ex = MXMD::Wrap::ExcludeLoad;
     mxmd.Load(mdo, {}, {ex::Materials, ex::Model, ex::Shaders});
   }
 
   auto var = MXMD::GetVariantFromWrapper(mxmd);
+  BinReaderRef rd(ctx->GetStream());
 
   std::visit(overloaded{
                  [ctx, rd](MXMD::V1::Header &hdr) {
@@ -319,34 +315,16 @@ void TryExtactMDO(BinReaderRef rd, AppExtractContext *ctx) {
              var);
 }
 
-void AppExtractFile(std::istream &stream, AppExtractContext *ctx) {
-  BinReaderRef rd(stream);
-  AFileInfo info(ctx->ctx->workingFile);
+void AppProcessFile(AppContext *ctx) {
 
-  if (info.GetExtension() == ".wismt" || info.GetExtension() == ".pcsmt") {
+  if (ctx->workingFile.GetExtension() == ".wismt" ||
+      ctx->workingFile.GetExtension() == ".pcsmt") {
     try {
-      TryExtractDRSM(rd, ctx);
+      TryExtractDRSM(ctx);
     } catch (const es::InvalidHeaderError &e) {
-      TryExtactMDO(rd, ctx);
+      TryExtactMDO(ctx);
     }
   } else {
-    TryExtactMDO(rd, ctx);
+    TryExtactMDO(ctx);
   }
-}
-
-size_t AppExtractStat(request_chunk requester) {
-  auto data = requester(0, 16);
-  auto *hdr = reinterpret_cast<DRSM::Header *>(data.data());
-
-  if (hdr->id == DRSM::ID) {
-    auto resData = requester(16, reinterpret_cast<uint32 &>(hdr->streamData));
-    auto *res = reinterpret_cast<DRSM::Resources *>(resData.data());
-    ProcessClass(*res);
-
-    if (res->textures) {
-      return res->textures->textures.numItems;
-    }
-  }
-
-  return 0;
 }

@@ -17,9 +17,9 @@
 
 #pragma once
 #include "core.hpp"
-#include "datas/string_view.hpp"
 #include "datas/supercore.hpp"
 #include "internal/gx2.hpp"
+#include <string_view>
 
 namespace MTXT {
 static constexpr uint32 ID = CompileFourCC("MTXT");
@@ -43,8 +43,8 @@ struct Header {
   uint32 id;
 };
 
-const Header *Mount(es::string_view data) {
-  return reinterpret_cast<const Header *>(data.end() - sizeof(Header));
+const Header *Mount(std::string_view data) {
+  return reinterpret_cast<const Header *>(&*data.end() - sizeof(Header));
 }
 
 void XN_EXTERN DecodeMipmap(const Header &header, const char *data,
