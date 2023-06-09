@@ -73,7 +73,7 @@ void AppProcessFile(AppContext *ctx) {
     std::string buffer = ctx->GetBuffer();
     texData = DecompressXBC1(buffer.data());
 
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     wr.WriteContainer(texData);
     return;
@@ -83,7 +83,7 @@ void AppProcessFile(AppContext *ctx) {
 
   if (auto hdr = MTXT::Mount(texData); hdr->id == MTXT::ID) {
     FByteswapper(*const_cast<MTXT::Header *>(hdr));
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     auto dds = ToDDS(hdr);
     wr.Write(dds);
@@ -93,7 +93,7 @@ void AppProcessFile(AppContext *ctx) {
     MTXT::DecodeMipmap(*hdr, texData.data(), outBuffer.data());
     wr.WriteContainer(outBuffer);
   } else if (auto hdr = LBIM::Mount(texData); hdr->id == LBIM::ID) {
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")));
+    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     if (!hiData.empty()) {
       auto mutHdr = const_cast<LBIM::Header *>(hdr);

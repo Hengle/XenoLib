@@ -1,10 +1,12 @@
-project(SMExtract VERSION 1)
+project(SMExtract)
 
 build_target(
   NAME
   sm_extract
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   sm_extract.cpp
   INCLUDES
@@ -18,13 +20,15 @@ build_target(
   START_YEAR
   2022)
 
-project(IM2GLTF VERSION 1)
+project(IM2GLTF)
 
 build_target(
   NAME
   im_to_gltf
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   im_to_gltf.cpp
   INCLUDES
@@ -39,13 +43,15 @@ build_target(
   START_YEAR
   2022)
 
-  project(TM2GLTF VERSION 1)
+  project(TM2GLTF)
 
   build_target(
     NAME
     tm_to_gltf
     TYPE
     ESMODULE
+    VERSION
+    1
     SOURCES
     tm_to_gltf.cpp
     INCLUDES

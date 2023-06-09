@@ -1,10 +1,12 @@
-project(BDAT2JSON VERSION 1)
+project(BDAT2JSON)
 
 build_target(
   NAME
   bdat_to_json
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   bdat_to_json.cpp
   INCLUDES

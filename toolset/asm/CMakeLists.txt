@@ -1,10 +1,12 @@
-project(ASM2JSON VERSION 1)
+project(ASM2JSON)
 
 build_target(
   NAME
   asm_to_json
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   asm_to_json.cpp
   INCLUDES

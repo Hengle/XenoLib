@@ -1,10 +1,12 @@
-project(DecBDAT VERSION 1)
+project(DecBDAT)
 
 build_target(
   NAME
   decrypt_bdat
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   decrypt_bdat.cpp
   LINKS
@@ -16,13 +18,15 @@ build_target(
   START_YEAR
   2022)
 
-project(DecARH VERSION 1)
+project(DecARH)
 
 build_target(
   NAME
   decrypt_arh
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   decrypt_arh.cpp
   LINKS

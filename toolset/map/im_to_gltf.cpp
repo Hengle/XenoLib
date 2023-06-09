@@ -382,8 +382,8 @@ void AppProcessFile(AppContext *ctx) {
     main.extensionsRequired.emplace_back("EXT_mesh_gpu_instancing");
     main.extensionsUsed.emplace_back("EXT_mesh_gpu_instancing");
 
-    main.FinishAndSave(ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")),
-                       {});
+    main.FinishAndSave(
+        ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")).str, {});
   } else {
     main.buffers.erase(main.buffers.begin());
 
@@ -391,7 +391,8 @@ void AppProcessFile(AppContext *ctx) {
       w.buffer = 0;
     }
 
-    gltf::Save(main, ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")),
-               {}, false);
+    gltf::Save(main,
+               ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")).str, {},
+               false);
   }
 }

@@ -1,10 +1,12 @@
-project(ARHExtract VERSION 1)
+project(ARHExtract)
 
 build_target(
   NAME
   extract_arh
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   extract_arh.cpp
   LINKS

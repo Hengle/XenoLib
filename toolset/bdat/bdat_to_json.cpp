@@ -221,7 +221,7 @@ void Extract(AppContext *ctx) {
       ectx->SendData(dumped);
     }
   } else {
-    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json"));
+    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json")).str;
     strWr << "{\n";
 
     for (auto &d : col) {
@@ -314,7 +314,7 @@ void Extract(AppContext *ctx) {
       ectx->SendData(dumped);
     }
   } else {
-    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json"));
+    auto &strWr = ctx->NewFile(ctx->workingFile.ChangeExtension(".json")).str;
     strWr << "{\n";
 
     for (auto &d : col) {

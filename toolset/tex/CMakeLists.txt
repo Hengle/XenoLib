@@ -1,10 +1,12 @@
-project(TEX2DDS VERSION 1)
+project(TEX2DDS)
 
 build_target(
   NAME
   tex_to_dds
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   tex_to_dds.cpp
   INCLUDES

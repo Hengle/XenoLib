@@ -289,6 +289,6 @@ void AppProcessFile(AppContext *ctx) {
     ProcessMeshes(main, m.get(), attrs.at(mIndex));
   }
 
-  gltf::Save(main, ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")), {},
-             false);
+  gltf::Save(main, ctx->NewFile(ctx->workingFile.ChangeExtension(".gltf")).str,
+             {}, false);
 }

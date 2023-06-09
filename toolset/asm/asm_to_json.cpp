@@ -556,6 +556,6 @@ void AppProcessFile(AppContext *ctx) {
 
   std::visit([&main](auto v) { ToJSON(v, main); }, asmb->Get());
 
-  ctx->NewFile(ctx->workingFile.ChangeExtension(".json"))
+  ctx->NewFile(ctx->workingFile.ChangeExtension(".json")).str
       << std::setw(2) << main;
 }

@@ -1,10 +1,12 @@
-project(MDO2GLTF VERSION 1)
+project(MDO2GLTF)
 
 build_target(
   NAME
   mdo_to_gltf
   TYPE
   ESMODULE
+  VERSION
+  1
   SOURCES
   mdo_to_gltf.cpp
   INCLUDES

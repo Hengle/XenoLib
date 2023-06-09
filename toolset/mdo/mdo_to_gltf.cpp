@@ -794,6 +794,6 @@ void AppProcessFile(AppContext *ctx) {
   main.ProcessSkins(model, skeleton);
   main.ProcessMeshes(model);
 
-  main.FinishAndSave(ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")),
+  main.FinishAndSave(ctx->NewFile(ctx->workingFile.ChangeExtension(".glb")).str,
                      {});
 }

@@ -76,6 +76,13 @@ if(BUILD_SHARED_LIBS)
     PRIVATE XN_EXPORT REF_EXPORT
     INTERFACE XN_IMPORT)
 
+  if(WIN32 OR MINGW)
+    set_target_properties(xeno PROPERTIES SUFFIX ${PROJECT_VERSION_MAJOR}.dll
+                                          PREFIX "")
+  else()
+    set_target_properties(xeno PROPERTIES SOVERSION ${PROJECT_VERSION_MAJOR})
+  endif()
+
   install(
     TARGETS xeno
     LIBRARY NAMELINK_SKIP DESTINATION $<IF:$<BOOL:${MINGW}>,bin,lib>

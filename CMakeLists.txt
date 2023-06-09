@@ -8,7 +8,7 @@ project(XenoLib VERSION 1)
 
 # ~~~
 # Valid targets:
-#  - xeno-static: static library target (XN_STATIC_LIB == ON, force enables havok-objects target)
+#  - xeno-static: static library target (XN_STATIC_LIB == ON, force enables xeno-objects target)
 #  - xeno-objects: static objects target (enabled by default, set NO_OBJECTS to disable all)
 #  - xeno: shared library target (BUILD_SHARED_LIBS == ON)
 # ~~~
@@ -16,7 +16,7 @@ project(XenoLib VERSION 1)
 option(TOOLSET "Build toolset." ON)
 option(ODR_TEST "Enable ODR testing." OFF)
 
-option(OBJECTS_PID "Imply PID for all objects." ${PYTHON_MODULE})
+option(OBJECTS_PID "Imply PID for all objects." OFF)
 option(XN_STATIC_LIB "Builds xeno-static target." OFF)
 
 set(CMAKE_CXX_STANDARD 20)
