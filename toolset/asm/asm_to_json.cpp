@@ -1,5 +1,5 @@
 /*  ASM2JSON
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/except.hpp"
-#include "datas/master_printer.hpp"
-#include "datas/reflector.hpp"
 #include "nlohmann/json.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/master_printer.hpp"
+#include "spike/reflect/reflector.hpp"
 #include "xenolib/bc/asmb.hpp"
 
 std::string_view filters[]{
@@ -556,6 +556,6 @@ void AppProcessFile(AppContext *ctx) {
 
   std::visit([&main](auto v) { ToJSON(v, main); }, asmb->Get());
 
-  ctx->NewFile(ctx->workingFile.ChangeExtension(".json")).str
-      << std::setw(2) << main;
+  ctx->NewFile(ctx->workingFile.ChangeExtension(".json")).str << std::setw(2)
+                                                              << main;
 }

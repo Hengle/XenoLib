@@ -1,10 +1,11 @@
 # XenoLib
 
-[![build](https://github.com/PredatorCZ/XenoLib/actions/workflows/cmake.yml/badge.svg)](https://github.com/PredatorCZ/XenoLib/actions/workflows/cmake.yml)
+[![build](https://github.com/PredatorCZ/XenoLib/actions/workflows/build.yaml/badge.svg)](https://github.com/PredatorCZ/XenoLib/actions/workflows/build.yaml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
-XenoLib is independent serialize library for various formats used by Xenoblade Engine.\
-Library is compilable under Clang 10, Windowns Clang 13.0.1 and G++10.
+XenoLib is independent serialize library for various formats used by Xenoblade Engine.
+
+Library is compilable under Clang 13+ and GCC 12+.
 
 ## Toolset
 
@@ -32,5 +33,5 @@ This library is available under GPL v3 license. (See LICENSE.md)
 This library uses following libraries:
 
 * Decaf
-* PreCore, Copyright (c) 2016-2022 Lukas Cone
-* zlib, Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
+* Spike, Copyright (c) 2016-2023 Lukas Cone (Apache 2)
+* zlib, Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler (Zlib)

@@ -1,7 +1,5 @@
 project(XenobladeToolset)
-add_subdirectory(${TPD_PATH}/precore/spike ${CMAKE_CURRENT_BINARY_DIR}/spike)
-add_subdirectory(${TPD_PATH}/precore/gltf ${CMAKE_CURRENT_BINARY_DIR}/gltf)
-set_target_properties(spike PROPERTIES OUTPUT_NAME xenoblade_toolset)
+set_target_properties(spike_cli PROPERTIES OUTPUT_NAME xenoblade_toolset)
 
 include(version)
 toolset_version()
@@ -16,4 +14,6 @@ add_spike_subdir(arh)
 add_spike_subdir(asm)
 add_spike_subdir(map)
 
-#add_spike_subdir(dev)
+if(NOT RELEASEVER)
+    add_spike_subdir(dev)
+endif()

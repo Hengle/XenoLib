@@ -1,5 +1,5 @@
 /*  ARHExtract
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,11 +15,11 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/except.hpp"
-#include "datas/master_printer.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/master_printer.hpp"
 #include "xenolib/arh.hpp"
 #include "xenolib/xbc1.hpp"
 

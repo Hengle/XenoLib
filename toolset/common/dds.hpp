@@ -1,5 +1,5 @@
 /*  xenoblade_toolset common code
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -16,7 +16,9 @@
 */
 
 #pragma once
-#include "formats/DDS.hpp"
+#include "spike/app_context.hpp"
+#include "spike/format/DDS.hpp"
+#include "spike/util/endian.hpp"
 #include "xenolib/lbim.hpp"
 #include "xenolib/mtxt.hpp"
 

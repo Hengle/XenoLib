@@ -2,7 +2,7 @@
 // license in 3rd_party/decaf
 
 #pragma once
-#include "datas/pointer.hpp"
+#include "spike/type/pointer.hpp"
 
 namespace gx2 {
 template <class C> using Pointer = es::PointerX86<C>;

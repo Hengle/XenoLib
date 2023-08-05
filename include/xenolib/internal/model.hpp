@@ -1,5 +1,5 @@
 /*  Xenoblade Engine Format Library
-    Copyright(C) 2017-2022 Lukas Cone
+    Copyright(C) 2017-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 
 #pragma once
 #include "mxmd.hpp"
-#include "uni/list_vector.hpp"
+#include "spike/uni/list_vector.hpp"
 #include "xenolib/mxmd.hpp"
 #include <array>
 #include <cassert>
@@ -141,7 +141,8 @@ struct Bone : uni::Bone {
   }
 
   void GetTM(es::Matrix44 &out) const override {
-    memcpy(&out, &bone->transform, sizeof(bone->transform));
+    memcpy(reinterpret_cast<void *>(&out), &bone->transform,
+           sizeof(bone->transform));
   }
   const Bone *Parent() const override { return parent; }
   size_t Index() const override { return index; }
@@ -208,7 +209,8 @@ public:
     return uni::TransformType::TMTYPE_MATRIX;
   }
   void GetTM(es::Matrix44 &out, size_t index) const override {
-    memcpy(&out, &bones[NodeIndex(index)].ibm, sizeof(V1::Bone::ibm));
+    memcpy(reinterpret_cast<void *>(&out), &bones[NodeIndex(index)].ibm,
+           sizeof(V1::Bone::ibm));
   }
   size_t NodeIndex(size_t index) const override {
     return main->boneIndices.items[index];
@@ -316,7 +318,8 @@ public:
     return uni::TransformType::TMTYPE_MATRIX;
   }
   void GetTM(es::Matrix44 &out, size_t index) const override {
-    memcpy(&out, main->nodeIBMs.Get() + index, sizeof(TransformMatrix));
+    memcpy(reinterpret_cast<void *>(&out), main->nodeIBMs.Get() + index,
+           sizeof(TransformMatrix));
   }
   size_t NodeIndex(size_t index) const override { return index; }
 

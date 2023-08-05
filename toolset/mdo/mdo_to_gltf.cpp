@@ -1,5 +1,5 @@
 /*  MDO2GLTF
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,18 +15,18 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/aabb.hpp"
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/endian.hpp"
-#include "datas/except.hpp"
-#include "datas/master_printer.hpp"
-#include "datas/matrix44.hpp"
-#include "datas/reflector.hpp"
-#include "gltf.hpp"
 #include "nlohmann/json.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/gltf.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
+#include "spike/master_printer.hpp"
+#include "spike/reflect/reflector.hpp"
+#include "spike/type/matrix44.hpp"
+#include "spike/util/aabb.hpp"
+#include "spike/util/endian.hpp"
 #include "xenolib/bc/skel.hpp"
 #include "xenolib/internal/mxmd.hpp"
 #include "xenolib/mxmd.hpp"

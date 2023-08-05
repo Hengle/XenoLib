@@ -1,5 +1,5 @@
 /*  Xenoblade Engine Format Library
-    Copyright(C) 2017-2022 Lukas Cone
+    Copyright(C) 2017-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 
 #include "xenolib/mtxt.hpp"
 #include "addrlib.inl"
-#include "datas/endian.hpp"
+#include "spike/util/endian.hpp"
 #include <cassert>
 #include <string>
 

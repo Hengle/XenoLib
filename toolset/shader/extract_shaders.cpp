@@ -1,5 +1,5 @@
 /*  SHDExtract
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,13 +15,13 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/except.hpp"
-#include "datas/master_printer.hpp"
-#include "datas/reflector.hpp"
 #include "latte/latte_disassembler.h"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/master_printer.hpp"
+#include "spike/reflect/reflector.hpp"
 #include "xenolib/internal/mxmd.hpp"
 #include "xenolib/mths.hpp"
 #include "xenolib/mxmd.hpp"
@@ -46,7 +46,7 @@ REFLECT(ENUMERATION(gx2::SamplerType), ENUM_MEMBER(gsampler1D),
         ENUM_MEMBER(gsamplerCube), );
 
 #define ENUM_MEMBERNAME(type, name)                                            \
-  EnumProxy { #name, static_cast < uint64>(enum_type::type) }
+  EnumProxy { #name, static_cast<uint64>(enum_type::type) }
 
 REFLECT(ENUMERATION(gx2::ShaderVarType), ENUM_MEMBERNAME(Void, void),
         ENUM_MEMBERNAME(Bool, bool), ENUM_MEMBERNAME(Int, int),
@@ -161,7 +161,9 @@ void ExtractMTHS(char *buffer, AppContext *ctx, std::string_view name) {
   }
 }
 
-template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 void ExtractMXMD(BinReaderRef rd, AppContext *ctx) {

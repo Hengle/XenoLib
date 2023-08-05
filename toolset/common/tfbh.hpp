@@ -1,5 +1,5 @@
 /*  gltf shared stream
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -18,8 +18,8 @@
 #pragma once
 #define ES_COPYABLE_POINTER
 
-#include "datas/pointer.hpp"
-#include "datas/vectors.hpp"
+#include "spike/type/pointer.hpp"
+#include "spike/type/vectors.hpp"
 #include <array>
 
 namespace TFBH {

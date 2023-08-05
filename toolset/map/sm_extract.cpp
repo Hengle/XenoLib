@@ -1,5 +1,5 @@
 /*  SMExtract
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@
 
 #include "tfbh.hpp"
 
-#include "datas/aabb.hpp"
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/except.hpp"
-#include "datas/master_printer.hpp"
 #include "dds.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
+#include "spike/master_printer.hpp"
+#include "spike/util/aabb.hpp"
 #include "xenolib/internal/model.hpp"
 #include "xenolib/msmd.hpp"
 #include "xenolib/mtxt.hpp"
@@ -32,7 +32,7 @@
 #include <map>
 #include <sstream>
 
-#include "datas/vectors_stream.hpp"
+#include "spike/io/vectors.hpp"
 
 std::string_view filters[]{
     ".casmhd$",

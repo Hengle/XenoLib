@@ -1,5 +1,5 @@
 /*  Xenoblade Engine Format Library
-    Copyright(C) 2017-2022 Lukas Cone
+    Copyright(C) 2017-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -17,7 +17,7 @@
 
 #pragma once
 #include "core.hpp"
-#include "datas/pointer.hpp"
+#include "spike/type/pointer.hpp"
 
 namespace SAR {
 static constexpr uint32 ID_BIG = CompileFourCC("SAR1");

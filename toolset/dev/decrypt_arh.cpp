@@ -1,5 +1,5 @@
 /*  DecARH
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,11 +15,11 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/except.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
 #include "xenolib/arh.hpp"
 
 std::string_view filters[]{
@@ -35,8 +35,8 @@ static AppInfo_s appInfo{
 
 AppInfo_s *AppInitModule() { return &appInfo; }
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
+void AppProcessFile(AppContext *ctx) {
+  BinReaderRef rd(ctx->GetStream());
   ARH::Header hdr;
   rd.Read(hdr);
 
@@ -44,7 +44,8 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     throw es::InvalidHeaderError(hdr.id);
   }
 
-  BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".arhdec")));
+  BinWritterRef wr(
+      ctx->NewFile(ctx->workingFile.ChangeExtension2("arhdec")).str);
   wr.Write(hdr);
 
   rd.Seek(hdr.tailLeafsBuffer);
@@ -82,7 +83,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
   wr.Seek(0);
   wr.Write(hdr);
 
-  auto &wrds = ctx->NewFile(ctx->workingFile.ChangeExtension(".arhdump"));
+  auto &wrds = ctx->NewFile(ctx->workingFile.ChangeExtension2("arhdump")).str;
   auto *tb = reinterpret_cast<const char *>(tailBuffer.data());
 
   for (size_t index = 0; auto t : trieBuffer) {

@@ -1,5 +1,5 @@
 /*  Xenoblade Engine Format Library
-    Copyright(C) 2017-2022 Lukas Cone
+    Copyright(C) 2017-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
 */
 
 #include "xenolib/mths.hpp"
-#include "datas/endian.hpp"
-#include "datas/except.hpp"
+#include "spike/except.hpp"
+#include "spike/util/endian.hpp"
 #include <cassert>
 
 template <> void XN_EXTERN FByteswapper(MTHS::VertexShader &item, bool) {

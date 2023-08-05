@@ -1,5 +1,5 @@
 /*  TEX2DDS
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/master_printer.hpp"
 #include "dds.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
+#include "spike/master_printer.hpp"
 #include "xenolib/xbc1.hpp"
 
 std::string_view filters[]{
@@ -73,7 +73,8 @@ void AppProcessFile(AppContext *ctx) {
     std::string buffer = ctx->GetBuffer();
     texData = DecompressXBC1(buffer.data());
 
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
+    BinWritterRef wr(
+        ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     wr.WriteContainer(texData);
     return;
@@ -83,7 +84,8 @@ void AppProcessFile(AppContext *ctx) {
 
   if (auto hdr = MTXT::Mount(texData); hdr->id == MTXT::ID) {
     FByteswapper(*const_cast<MTXT::Header *>(hdr));
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
+    BinWritterRef wr(
+        ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     auto dds = ToDDS(hdr);
     wr.Write(dds);
@@ -93,7 +95,8 @@ void AppProcessFile(AppContext *ctx) {
     MTXT::DecodeMipmap(*hdr, texData.data(), outBuffer.data());
     wr.WriteContainer(outBuffer);
   } else if (auto hdr = LBIM::Mount(texData); hdr->id == LBIM::ID) {
-    BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
+    BinWritterRef wr(
+        ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
 
     if (!hiData.empty()) {
       auto mutHdr = const_cast<LBIM::Header *>(hdr);

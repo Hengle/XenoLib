@@ -1,5 +1,5 @@
 /*  SMTExtract
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,11 +15,11 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/except.hpp"
 #include "dds.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
 #include "xenolib/drsm.hpp"
 #include "xenolib/internal/mxmd.hpp"
 #include "xenolib/mxmd.hpp"
@@ -281,7 +281,9 @@ void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
   }
 }
 
-template <class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template <class... Ts> struct overloaded : Ts... {
+  using Ts::operator()...;
+};
 template <class... Ts> overloaded(Ts...) -> overloaded<Ts...>;
 
 void TryExtactMDO(AppContext *ctx) {

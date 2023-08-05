@@ -19,15 +19,16 @@ option(ODR_TEST "Enable ODR testing." OFF)
 option(OBJECTS_PID "Imply PID for all objects." OFF)
 option(XN_STATIC_LIB "Builds xeno-static target." OFF)
 
+option(NO_OBJECTS "" OFF)
+option(CLI "" ${TOOLSET})
+option(GLTF "" ${TOOLSET})
+option(BUILD_SHARED_LIBS "" ${TOOLSET})
+
 set(CMAKE_CXX_STANDARD 20)
 add_compile_options(-Wall -Wextra)
 
-if(TOOLSET)
-  set(BUILD_SHARED_LIBS ON)
-endif()
-
 set(TPD_PATH ${CMAKE_CURRENT_SOURCE_DIR}/3rd_party)
-add_subdirectory(${TPD_PATH}/precore)
+add_subdirectory(${TPD_PATH}/spike)
 include(targetex)
 add_subdirectory(source)
 

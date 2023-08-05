@@ -10,7 +10,7 @@ build_target(
   SOURCES
   bdat_to_json.cpp
   INCLUDES
-  ${TPD_PATH}/precore/3rd_party/json
+  ${TPD_PATH}/spike/3rd_party/json
   LINKS
   xeno
   AUTHOR

@@ -1,5 +1,5 @@
 /*  Xenoblade Engine Format Library
-    Copyright(C) 2017-2022 Lukas Cone
+    Copyright(C) 2017-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -16,10 +16,10 @@
 */
 
 #include "xenolib/mxmd.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/endian.hpp"
-#include "datas/except.hpp"
-#include "uni/list_vector.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/uni/list_vector.hpp"
+#include "spike/util/endian.hpp"
 #include "xenolib/drsm.hpp"
 #include "xenolib/internal/model.hpp"
 

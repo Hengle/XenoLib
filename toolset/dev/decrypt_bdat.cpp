@@ -1,5 +1,5 @@
 /*  DecBDAT
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/endian.hpp"
-#include "datas/except.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
+#include "spike/util/endian.hpp"
 #include "xenolib/bdat.hpp"
 
 std::string_view filters[]{
@@ -42,8 +42,8 @@ struct HeaderImpl : Header {
 };
 } // namespace BDAT::V1
 
-void AppProcessFile(std::istream &stream, AppContext *ctx) {
-  BinReaderRef rd(stream);
+void AppProcessFile(AppContext *ctx) {
+  BinReaderRef rd(ctx->GetStream());
   bool endianBig = false;
   {
     BDAT::V1::Collection col;
@@ -98,6 +98,7 @@ void AppProcessFile(std::istream &stream, AppContext *ctx) {
     }
   }
 
-  BinWritterRef wr(ctx->NewFile(ctx->workingFile.ChangeExtension(".bdatdec")));
+  BinWritterRef wr(
+      ctx->NewFile(ctx->workingFile.ChangeExtension2("bdatdec")).str);
   wr.WriteContainer(buffer);
 }

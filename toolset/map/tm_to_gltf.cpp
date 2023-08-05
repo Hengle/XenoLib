@@ -1,5 +1,5 @@
 /*  TM2GLTF
-    Copyright(C) 2022 Lukas Cone
+    Copyright(C) 2022-2023 Lukas Cone
 
     This program is free software : you can redistribute it and / or modify
     it under the terms of the GNU General Public License as published by
@@ -17,14 +17,14 @@
 
 #include "tfbh.hpp"
 
-#include "datas/app_context.hpp"
-#include "datas/binreader_stream.hpp"
-#include "datas/binwritter_stream.hpp"
-#include "datas/endian.hpp"
-#include "datas/except.hpp"
-#include "datas/reflector.hpp"
-#include "gltf.hpp"
 #include "project.h"
+#include "spike/app_context.hpp"
+#include "spike/except.hpp"
+#include "spike/gltf.hpp"
+#include "spike/io/binreader_stream.hpp"
+#include "spike/io/binwritter_stream.hpp"
+#include "spike/reflect/reflector.hpp"
+#include "spike/util/endian.hpp"
 #include "xenolib/mstm.hpp"
 #include <cstdlib>
 
