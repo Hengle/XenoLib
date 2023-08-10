@@ -162,16 +162,50 @@ struct MainGLTF : GLTF {
         es::Matrix44 mtx;
         s->GetTM(mtx, b);
         ibmStream.wr.Write(mtx);
-        auto boneName = bones->At(s->NodeIndex(b))->Name();
+        auto bone = bones->At(s->NodeIndex(b));
+        auto boneName = bone->Name();
 
-        sk.joints.push_back([&] {
+        sk.joints.push_back([&]() -> size_t {
           for (auto &n : nodes) {
             if (n.name == boneName) {
               return std::distance(nodes.data(), &n);
             }
           }
 
-          throw std::runtime_error("Node " + boneName + " not found");
+          auto &nnode = nodes.emplace_back();
+          nnode.name = boneName;
+
+          if (auto parent = bone->Parent(); parent) {
+            uni::RTSValue boneTM;
+            bone->GetTM(boneTM);
+
+            int32 parentId = [&]() -> int32 {
+              auto parentName = parent->Name();
+
+              for (auto &n : nodes) {
+                if (n.name == parentName) {
+                  return std::distance(nodes.data(), &n);
+                }
+              }
+
+              return -1;
+            }();
+
+            if (parentId > -1) {
+              memcpy(nnode.translation.data(), &boneTM.translation,
+                     sizeof(nnode.translation));
+              memcpy(nnode.rotation.data(), &boneTM.rotation,
+                     sizeof(nnode.rotation));
+              nodes.at(parentId).children.push_back(nodes.size() - 1);
+              return nodes.size() - 1;
+            }
+          }
+
+          mtx = -mtx;
+          memcpy(nnode.matrix.data(), &mtx, sizeof(mtx));
+
+          scenes.front().nodes.push_back(nodes.size() - 1);
+          return nodes.size() - 1;
         }());
       }
 

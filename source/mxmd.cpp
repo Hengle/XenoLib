@@ -522,14 +522,25 @@ template <> void XN_EXTERN ProcessClass(V3::Bone &item, ProcessFlags flags) {
   item.name.Fixup(flags.base);
 }
 
+template <> void XN_EXTERN ProcessClass(V3::ProcBones &item, ProcessFlags flags) {
+  flags.NoBigEndian();
+  flags.NoProcessDataOut();
+  flags.NoAutoDetect();
+  es::FixupPointers(flags.base, item.bones, item.boneTMs, item.values);
+}
+
 template <> void XN_EXTERN ProcessClass(V3::Skin &item, ProcessFlags flags) {
   flags.NoBigEndian();
   flags.NoProcessDataOut();
   flags.NoAutoDetect();
   flags.base = reinterpret_cast<char *>(&item);
   es::FixupPointers(flags.base, item.nodes, item.nodeIBMs, item.nodeTMs0,
-                    item.nodeTMs1);
+                    item.nodeTMs1, item.skeletonIds, item.proceduralBones);
   assert(item.count1 == item.count2);
+
+  if (item.UseProceduralBones()) {
+    ProcessClass(*item.proceduralBones, flags);
+  }
 
   V3::Bone *nodes = item.nodes;
 
@@ -871,7 +882,7 @@ namespace MXMD {
 class Impl {
 public:
   std::string buffer;
-  std::variant<MDO::Skeleton, MDO::V3Skeleton> skel;
+  std::variant<MDO::V1Skeleton, MDO::V3Skeleton> skel;
   std::variant<MDO::V1Model, MDO::V3Model> model;
 
   void Load(BinReaderRef rd, BinReaderRef stream_,
@@ -886,7 +897,7 @@ public:
     if (hdr.version == Versions::MXMDVer1) {
       V1::Header &main = static_cast<V1::Header &>(hdr);
       if (main.models) {
-        skel = MDO::Skeleton(main.models->bones.items,
+        skel = MDO::V1Skeleton(main.models->bones.items,
                              main.models->bones.numItems);
         model = MDO::V1Model(main);
       }

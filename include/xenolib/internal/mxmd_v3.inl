@@ -58,6 +58,41 @@ struct Bone {
   uint32 null[2];
 };
 
+struct ProcBone {
+  uint16 boneIndex;
+  uint16 parentBoneIndex;
+  uint16 endEffectorBoneIndex;
+  uint16 beginEffectoBoneIndex;
+  uint16 unk5;
+  uint16 unk6;
+  uint16 numValues;
+  uint16 valuesBeginIndex;
+  Vector position;
+  float null[6];
+  Vector4 rotation;
+  Vector unkPosition;
+};
+
+struct ProcValues {
+  float r0[4];
+  float r1[4];
+  float r2[4];
+  float r3[2];
+};
+
+struct ProcBoneTMs {
+  es::Matrix44 m0;
+  es::Matrix44 m1;
+  es::Matrix44 m2;
+};
+
+struct ProcBones {
+  Array<ProcBone> bones;
+  Array<ProcValues> values;
+  Pointer<ProcBoneTMs> boneTMs;
+  uint32 unk;
+};
+
 struct Skin {
   uint32 count1;
   uint32 count2;
@@ -65,6 +100,14 @@ struct Skin {
   Pointer<TransformMatrix> nodeIBMs;
   Pointer<char> nodeTMs0;
   Pointer<char> nodeTMs1;
+  ArrayInv<uint16> skeletonIds;
+  uint32 null0[2];
+  Pointer<ProcBones> proceduralBones;
+  uint32 null1[4];
+
+  bool UseProceduralBones() const {
+    return (null1[0] | null1[1] | null1[2] | null1[3]) == 0;
+  }
 };
 
 struct MorphControl {

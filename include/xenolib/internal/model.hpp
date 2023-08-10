@@ -18,6 +18,7 @@
 #pragma once
 #include "mxmd.hpp"
 #include "spike/uni/list_vector.hpp"
+#include "spike/uni/rts.hpp"
 #include "xenolib/mxmd.hpp"
 #include <array>
 #include <cassert>
@@ -153,10 +154,10 @@ struct Bone : uni::Bone {
   }
 };
 
-struct Skeleton : uni::Skeleton {
+struct V1Skeleton : uni::Skeleton {
   uni::VectorList<uni::Bone, Bone> bones;
-  Skeleton() = default;
-  Skeleton(V1::Bone *bone, size_t count) {
+  V1Skeleton() = default;
+  V1Skeleton(V1::Bone *bone, size_t count) {
     bones.storage.resize(count);
 
     for (size_t i = 0; i < count; i++) {
@@ -271,16 +272,16 @@ public:
 struct V3Bone : uni::Bone {
   V3::Bone *bone;
   size_t index;
+  V3Bone *parent = nullptr;
+  uni::RTSValue tm{};
 
   uni::TransformType TMType() const override {
     return uni::TransformType::TMTYPE_RTS;
   }
 
-  /*void GetTM(uni::RTSValue &out) const override {
-    //memcpy(&out., &bone->transform, sizeof(bone->transform));
-  }*/
+  void GetTM(uni::RTSValue &out) const override { out = tm; }
 
-  const Bone *Parent() const override { return nullptr; }
+  const Bone *Parent() const override { return parent; }
   size_t Index() const override { return index; }
   std::string Name() const override { return bone->name.Get(); }
 
@@ -300,6 +301,18 @@ struct V3Skeleton : uni::Skeleton {
       bne.bone = skin->nodes.Get() + i;
       bne.index = i;
       bones.storage[i] = bne;
+    }
+
+    if (skin->UseProceduralBones()) {
+      V3::ProcBones *pBones = skin->proceduralBones;
+      V3::ProcBoneTMs *tms = pBones->boneTMs;
+      for (auto &b : pBones->bones) {
+        auto &sBone = bones.storage.at(b.boneIndex);
+        sBone.parent = &bones.storage.at(b.parentBoneIndex);
+        tms->m2.Decompose(sBone.tm.translation, sBone.tm.rotation,
+                          sBone.tm.scale);
+        tms++;
+      }
     }
   }
 
