@@ -13,6 +13,7 @@ add_spike_subdir(shader)
 add_spike_subdir(arh)
 add_spike_subdir(asm)
 add_spike_subdir(map)
+add_spike_subdir(font)
 
 if(NOT RELEASEVER)
     add_spike_subdir(dev)
