@@ -15,12 +15,12 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "dds.hpp"
 #include "project.h"
 #include "spike/app_context.hpp"
 #include "spike/io/binreader_stream.hpp"
 #include "spike/io/binwritter_stream.hpp"
 #include "spike/master_printer.hpp"
+#include "texture.hpp"
 #include "xenolib/xbc1.hpp"
 
 std::string_view filters[]{
@@ -84,34 +84,17 @@ void AppProcessFile(AppContext *ctx) {
 
   if (auto hdr = MTXT::Mount(texData); hdr->id == MTXT::ID) {
     FByteswapper(*const_cast<MTXT::Header *>(hdr));
-    BinWritterRef wr(
-        ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
-
-    auto dds = ToDDS(hdr);
-    wr.Write(dds);
-    std::string outBuffer;
-    DDS::Mips dummy;
-    outBuffer.resize(dds.ComputeBufferSize(dummy));
-    MTXT::DecodeMipmap(*hdr, texData.data(), outBuffer.data());
-    wr.WriteContainer(outBuffer);
+    MTXTAddrLib arrdLib;
+    ctx->NewImage(MakeContext(hdr, arrdLib, texData.data()));
   } else if (auto hdr = LBIM::Mount(texData); hdr->id == LBIM::ID) {
-    BinWritterRef wr(
-        ctx->NewFile(ctx->workingFile.ChangeExtension(".dds")).str);
-
     if (!hiData.empty()) {
       auto mutHdr = const_cast<LBIM::Header *>(hdr);
       mutHdr->width *= 2;
       mutHdr->height *= 2;
     }
 
-    auto dds = ToDDS(hdr);
-    wr.Write(dds);
-    std::string outBuffer;
-    DDS::Mips dummy;
-    outBuffer.resize(dds.ComputeBufferSize(dummy));
-    LBIM::DecodeMipmap(*hdr, hiData.empty() ? texData.data() : hiData.data(),
-                       outBuffer.data());
-    wr.WriteContainer(outBuffer);
+    ctx->NewImage(
+        MakeContext(hdr, hiData.empty() ? texData.data() : hiData.data()));
   } else {
     throw std::runtime_error("Not valid texture");
   }

@@ -60,8 +60,4 @@ struct Header {
 const Header *Mount(std::string_view data) {
   return reinterpret_cast<const Header *>(&*data.end() - sizeof(Header));
 }
-
-void XN_EXTERN DecodeMipmap(const Header &header, const char *data,
-                            char *outData, uint32 mipIndex = 0);
-
 } // namespace LBIM

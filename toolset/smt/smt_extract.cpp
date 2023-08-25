@@ -15,11 +15,11 @@
     along with this program.If not, see <https://www.gnu.org/licenses/>.
 */
 
-#include "dds.hpp"
 #include "project.h"
 #include "spike/app_context.hpp"
 #include "spike/except.hpp"
 #include "spike/io/binreader_stream.hpp"
+#include "texture.hpp"
 #include "xenolib/drsm.hpp"
 #include "xenolib/internal/mxmd.hpp"
 #include "xenolib/mxmd.hpp"
@@ -32,7 +32,7 @@ std::string_view filters[]{
     ".pcsmt$",
 };
 
-static constexpr bool DEV_EXTRACT_MODEL = false;
+static constexpr bool DEV_EXTRACT_MODEL = true;
 static constexpr bool DEV_EXTRACT_ALL = false;
 
 static AppInfo_s appInfo{
@@ -139,45 +139,31 @@ void TryExtractDRSM(AppContext *ctx) {
 
       std::string_view miMip(middleTextures + entry.offset, entry.size);
       auto tex = LBIM::Mount(miMip);
-      ectx->NewFile(t.name.Get() + std::string(".dds"));
       numProcessedTextures++;
 
       if (entry.unkIndex > resources->middleTexturesStreamIndex) {
         std::string hiMip =
             streams[entry.unkIndex - resources->middleTexturesStreamIndex]
                 .GetData();
-        std::string hiMipOut;
-        hiMipOut.resize(hiMip.size());
         auto texCopy = *tex;
         texCopy.width *= 2;
         texCopy.height *= 2;
-        SendDDS(&texCopy, ectx);
-        LBIM::DecodeMipmap(texCopy, hiMip.data(), hiMipOut.data());
-        ectx->SendData(hiMipOut);
+        ectx->NewImage(t.name.Get(), MakeContext(&texCopy, hiMip.data()));
       } else {
-        std::string miMipOut;
-        miMipOut.resize(miMip.size());
-        SendDDS(tex, ectx);
-        LBIM::DecodeMipmap(*tex, miMip.data(), miMipOut.data());
-        ectx->SendData(miMipOut);
+        ectx->NewImage(t.name.Get(), MakeContext(tex, miMip.data()));
       }
 
     } else {
       numProcessedTextures++;
-      ectx->NewFile(t.name.Get() + std::string(".dds"));
       auto &entry = entries[resources->lowTexturesStreamEntryIndex];
       auto loMips = cache.GetSet(streams[resources->lowTexturesStreamIndex], 0);
       std::string_view loMip(loMips + entry.offset + t.lowOffset, t.lowSize);
 
       if (loMip.starts_with("DDS")) {
+        ectx->NewFile(t.name.Get());
         ectx->SendData(loMip);
       } else {
-        std::string loMipOut;
-        loMipOut.resize(loMip.size());
-        auto tex = LBIM::Mount(loMip);
-        SendDDS(tex, ectx);
-        LBIM::DecodeMipmap(*tex, loMip.data(), loMipOut.data());
-        ectx->SendData(loMipOut);
+        SendTextureLB(loMip, ectx, t.name.Get());
       }
     }
   }
@@ -190,7 +176,8 @@ void TryExtractDRSM(AppContext *ctx) {
 void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
                    DRSM::Textures *cachedTextures, AppContext *ctx,
                    void (*dataSender)(std::string_view texData,
-                                      AppExtractContext *ctx)) {
+                                      AppExtractContext *ctx,
+                                      std::string name)) {
   std::set<std::string_view> processedTextures;
   auto ectx = ctx->ExtractContext();
 
@@ -208,9 +195,8 @@ void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
         }
 
         processedTextures.emplace(tName);
-        ectx->NewFile(std::string(tName) + ".dds");
         std::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
-        dataSender(texData, ectx);
+        dataSender(texData, ectx, std::string(tName) + ".dds");
       }
     }
   }
@@ -225,11 +211,9 @@ void ExtractSimple(BinReaderRef rd, MXMD::V1::SMTHeader *hdr,
       continue;
     }
 
-    ectx->NewFile(std::string(tName) + ".dds");
-
     std::string_view texData(
         reinterpret_cast<char *>(cachedTextures) + t.lowOffset, t.lowSize);
-    dataSender(texData, ectx);
+    dataSender(texData, ectx, std::string(tName) + ".dds");
   }
 }
 
@@ -255,10 +239,8 @@ void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
         }
 
         processedTextures.emplace(tName);
-        ectx->NewFile(std::string(tName) + ".dds");
-
         std::string_view texData(buffer.data() + t.lowOffset, t.lowSize);
-        SendTexelsLB(texData, ectx);
+        SendTextureLB(texData, ectx, std::string(tName) + ".dds");
       }
     }
   }
@@ -273,11 +255,10 @@ void ExtractSimple(BinReaderRef rd, MXMD::V3::SMTHeader *hdr,
       continue;
     }
 
-    ectx->NewFile(std::string(tName) + ".dds");
-
     std::string_view texData(
         reinterpret_cast<char *>(lowTextures) + t.lowOffset, t.lowSize);
-    SendTexelsLB(texData, ectx);
+
+    SendTextureLB(texData, ectx, std::string(tName) + ".dds");
   }
 }
 
@@ -303,11 +284,11 @@ void TryExtactMDO(AppContext *ctx) {
   std::visit(overloaded{
                  [ctx, rd](MXMD::V1::Header &hdr) {
                    ExtractSimple(rd, hdr.uncachedTextures, hdr.cachedTextures,
-                                 ctx, SendTexelsGTX);
+                                 ctx, SendTextureGTX);
                  },
                  [ctx, rd](MXMD::V2::Header &hdr) {
                    ExtractSimple(rd, hdr.uncachedTextures, hdr.cachedTextures,
-                                 ctx, SendTexelsLB);
+                                 ctx, SendTextureLB);
                  },
                  [ctx, rd](MXMD::V3::Header &hdr) {
                    auto smtHdr = std::get<MXMD::V3::SMTHeader *>(hdr.GetSMT());

@@ -18,9 +18,10 @@
         along with this program.If not, see < http://www.gnu.org/licenses/>.
 */
 
-#include "addrlib.h"
 #include <algorithm>
+#include "xenolib/mtxt.hpp"
 
+namespace MTXT {
 unsigned int computeSurfaceThickness(gx2::TileMode tileMode) {
   using namespace gx2;
   switch (tileMode) {
@@ -257,3 +258,4 @@ computeSurfaceAddrFromCoordMacroTiled(unsigned int x, unsigned int y,
   return (bank << 9) | (pipe << 8) | (255 & totalOffset) |
          ((totalOffset & -256) << 3);
 }
+} // namespace MTXT

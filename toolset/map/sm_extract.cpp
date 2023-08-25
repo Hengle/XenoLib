@@ -17,7 +17,6 @@
 
 #include "tfbh.hpp"
 
-#include "dds.hpp"
 #include "project.h"
 #include "spike/app_context.hpp"
 #include "spike/except.hpp"
@@ -25,6 +24,7 @@
 #include "spike/io/binwritter_stream.hpp"
 #include "spike/master_printer.hpp"
 #include "spike/util/aabb.hpp"
+#include "texture.hpp"
 #include "xenolib/internal/model.hpp"
 #include "xenolib/msmd.hpp"
 #include "xenolib/mtxt.hpp"
@@ -343,13 +343,14 @@ void ExtractV1(MSMD::V1::Header &hdr, AppExtractContext *ctx,
   };
 
   for (size_t index = 0; auto a : hdr.objectTextures) {
-    ctx->NewFile("tex/h/" + mapName + "." + std::to_string(index) + ".dds");
+    std::string texName("tex/h/" + mapName + "." + std::to_string(index) +
+                        ".dds");
     if (a.highMap.size > 0) {
       auto data = GetData(a.highMap);
-      SendTexelsGTX(data, ctx);
+      SendTextureGTX(data, ctx, texName);
     } else {
       auto data = GetData(a.midMap);
-      SendTexelsGTX(data, ctx);
+      SendTextureGTX(data, ctx, texName);
     }
     index++;
   }
@@ -362,14 +363,14 @@ void ExtractV1(MSMD::V1::Header &hdr, AppExtractContext *ctx,
     ProcessClass(*thdr, {ProcessFlag::EnsureBigEndian});
 
     for (size_t tindex = 0; auto &mt : thdr->textures) {
-      ctx->NewFile("tex/m/" + mapName + "." + std::to_string(index) + "." +
-                   std::to_string(tindex++) + ".dds");
+      std::string texName("tex/m/" + mapName + "." + std::to_string(index) +
+                          "." + std::to_string(tindex++) + ".dds");
 
       if (mt.uncachedID > -1) {
         auto hData = GetData(streamingTextures[mt.uncachedID]);
-        SendTexelsGTX(hData, ctx);
+        SendTextureGTX(hData, ctx, texName);
       } else {
-        SendTexelsGTX({data.data() + mt.offset, mt.size}, ctx);
+        SendTextureGTX({data.data() + mt.offset, mt.size}, ctx, texName);
       }
     }
 
@@ -546,7 +547,8 @@ void ExtractV2(MSMD::V2::Header &hdr, AppExtractContext *ctx,
   };
 
   for (size_t index = 0; auto a : hdr.objectTextures) {
-    ctx->NewFile("tex/h/" + mapName + "." + std::to_string(index) + ".dds");
+    std::string texName("tex/h/" + mapName + "." + std::to_string(index) +
+                        ".dds");
     auto data = GetData(a.midMap);
     if (a.highMap.size > 0) {
       data.insert(0, GetData(a.highMap));
@@ -555,7 +557,7 @@ void ExtractV2(MSMD::V2::Header &hdr, AppExtractContext *ctx,
       hdr->height *= 2;
     }
 
-    SendTexelsLB(data, ctx);
+    SendTextureLB(data, ctx, texName);
     index++;
   }
 }

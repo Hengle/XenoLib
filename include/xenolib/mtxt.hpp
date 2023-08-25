@@ -17,8 +17,8 @@
 
 #pragma once
 #include "core.hpp"
-#include "spike/util/supercore.hpp"
 #include "internal/gx2.hpp"
+#include "spike/util/supercore.hpp"
 #include <string_view>
 
 namespace MTXT {
@@ -47,7 +47,30 @@ const Header *Mount(std::string_view data) {
   return reinterpret_cast<const Header *>(&*data.end() - sizeof(Header));
 }
 
-void XN_EXTERN DecodeMipmap(const Header &header, const char *data,
-                            char *outData, uint32 mipIndex = 0);
+struct AddrLibMacroTilePrecomp {
+  uint32 microTileThickness, microTileBits, microTileBytes, numSamples,
+      swizzle_, sliceBytes, macroTileAspectRatio, macroTilePitch,
+      macroTileHeight, macroTilesPerRow, macroTileBytes, bankSwapWidth,
+      swappedBank, bpp;
+  mutable uint32 sampleSlice;
+
+  XN_EXTERN AddrLibMacroTilePrecomp(uint32 _bpp, uint32 pitch, uint32 height,
+                                    gx2::TileMode tileMode, uint32 pipeSwizzle,
+                                    uint32 bankSwizzle);
+};
+
+struct AddrLibMicroTilePrecomp {
+  uint32 microTileBytes, microTilesPerRow;
+  uint32 bpp;
+
+  XN_EXTERN AddrLibMicroTilePrecomp(uint32 _bpp, uint32 pitch,
+                                    gx2::TileMode tileMode);
+};
+
+uint32 XN_EXTERN computeSurfaceAddrFromCoordMacroTiled(
+    uint32 x, uint32 y, const AddrLibMacroTilePrecomp &precomp);
+
+uint32 XN_EXTERN computeSurfaceAddrFromCoordMicroTiled(
+    uint32 x, uint32 y, const AddrLibMicroTilePrecomp &precomp);
 
 } // namespace MTXT
