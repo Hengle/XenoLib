@@ -12,7 +12,7 @@ build_target(
   INCLUDES
   ../common
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR
@@ -34,8 +34,8 @@ build_target(
   INCLUDES
   ../common
   LINKS
-  xeno
-  gltf
+  xeno-interface
+  gltf-interface
   AUTHOR
   "Lukas Cone"
   DESCR
@@ -43,25 +43,25 @@ build_target(
   START_YEAR
   2022)
 
-  project(TM2GLTF)
+project(TM2GLTF)
 
-  build_target(
-    NAME
-    tm_to_gltf
-    TYPE
-    ESMODULE
-    VERSION
-    1
-    SOURCES
-    tm_to_gltf.cpp
-    INCLUDES
-    ../common
-    LINKS
-    xeno
-    gltf
-    AUTHOR
-    "Lukas Cone"
-    DESCR
-    "Xenoblade Terrain Model to GLTF"
-    START_YEAR
-    2022)
+build_target(
+  NAME
+  tm_to_gltf
+  TYPE
+  ESMODULE
+  VERSION
+  1
+  SOURCES
+  tm_to_gltf.cpp
+  INCLUDES
+  ../common
+  LINKS
+  xeno-interface
+  gltf-interface
+  AUTHOR
+  "Lukas Cone"
+  DESCR
+  "Xenoblade Terrain Model to GLTF"
+  START_YEAR
+  2022)

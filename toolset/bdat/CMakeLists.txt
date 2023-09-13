@@ -12,7 +12,7 @@ build_target(
   INCLUDES
   ${TPD_PATH}/spike/3rd_party/json
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR

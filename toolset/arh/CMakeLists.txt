@@ -10,7 +10,7 @@ build_target(
   SOURCES
   extract_arh.cpp
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR

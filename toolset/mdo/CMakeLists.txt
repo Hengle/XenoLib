@@ -11,9 +11,10 @@ build_target(
   mdo_to_gltf.cpp
   INCLUDES
   ../common
+  ${TPD_PATH}/3rd_party/json
   LINKS
-  xeno
-  gltf
+  xeno-interface
+  gltf-interface
   AUTHOR
   "Lukas Cone"
   DESCR

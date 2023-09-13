@@ -12,7 +12,7 @@ build_target(
   INCLUDES
   ../common
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR

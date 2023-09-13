@@ -10,7 +10,7 @@ build_target(
   SOURCES
   sar_extract.cpp
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR
@@ -30,7 +30,7 @@ build_target(
   SOURCES
   make_sar.cpp
   LINKS
-  xeno
+  xeno-interface
   AUTHOR
   "Lukas Cone"
   DESCR

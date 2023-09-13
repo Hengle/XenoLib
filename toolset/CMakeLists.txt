@@ -1,5 +1,7 @@
+cmake_minimum_required(VERSION 3.13)
 project(XenobladeToolset)
 set_target_properties(spike_cli PROPERTIES OUTPUT_NAME xenoblade_toolset)
+target_link_libraries(spike_cli xeno-objects)
 
 include(version)
 toolset_version()
@@ -15,6 +17,6 @@ add_spike_subdir(asm)
 add_spike_subdir(map)
 add_spike_subdir(font)
 
-if(NOT RELEASEVER)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_spike_subdir(dev)
 endif()

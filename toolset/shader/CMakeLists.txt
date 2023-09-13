@@ -12,7 +12,7 @@ build_target(
   SOURCES
   extract_shaders.cpp
   LINKS
-  xeno
+  xeno-interface
   decaf
   AUTHOR
   "Lukas Cone"
